@@ -3127,9 +3127,10 @@ handleTimeouts(MasterConnection self)
     /* check T3 timeout */
     if (checkT3Timeout(self, currentTime))
     {
-        if (writeToSocket(self, TESTFR_ACT_MSG, TESTFR_ACT_MSG_SIZE) < 0)
-        {
+        int writeToSocketResult = writeToSocket(self, TESTFR_ACT_MSG, TESTFR_ACT_MSG_SIZE);
 
+        if (writeToSocketResult < 0)
+        {
             DEBUG_PRINT("CS104 SLAVE: Failed to write TESTFR ACT message\n");
 #if (CONFIG_USE_SEMAPHORES == 1)
             Semaphore_wait(self->stateLock);
@@ -3140,16 +3141,18 @@ handleTimeouts(MasterConnection self)
             Semaphore_post(self->stateLock);
 #endif
         }
+        else if (writeToSocketResult > 0)
+        {
+#if (CONFIG_USE_SEMAPHORES == 1)
+            Semaphore_wait(self->stateLock);
+#endif
+            self->waitingForTestFRcon = true;
+            resetTestFRConTimeout(self, currentTime);
 
 #if (CONFIG_USE_SEMAPHORES == 1)
-        Semaphore_wait(self->stateLock);
+            Semaphore_post(self->stateLock);
 #endif
-        self->waitingForTestFRcon = true;
-        resetTestFRConTimeout(self, currentTime);
-
-#if (CONFIG_USE_SEMAPHORES == 1)
-        Semaphore_post(self->stateLock);
-#endif
+        }
     }
 
 #if (CONFIG_USE_SEMAPHORES == 1)
