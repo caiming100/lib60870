@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2022 Michael Zillgith
+ *  Copyright 2016-2025 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -27,6 +27,10 @@
 
 #include "tls_config.h"
 #include "iec60870_master.h"
+
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_auth_60870_5_7.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,6 +78,25 @@ CS104_Connection_create(const char* hostname, int tcpPort);
 CS104_Connection
 CS104_Connection_createSecure(const char* hostname, int tcpPort, TLSConfiguration tlsConfig);
 
+/**
+ * \brief Add a plugin to extend the master functionality
+ * 
+ * \param plugin the plugin to add
+ */
+void
+CS104_Connection_addPlugin(CS104_Connection self, CS101_MasterPlugin plugin);
+
+#ifdef SEC_AUTH_60870_5_7
+
+/**
+ * \brief Set a SecureEndpoint instance for this connection to enable secure authentication
+ *
+ * \param secureEndpoint the SecureEndpoint instance
+ */
+void
+CS104_Connection_setSecureEndpoint(CS104_Connection self, SecureEndpoint secureEndpoint);
+
+#endif /* SEC_AUTH_60870_5_7 */
 
 /**
  * \brief Set the local IP address and port to be used by the client
@@ -130,6 +153,17 @@ CS104_Connection_setAppLayerParameters(CS104_Connection self, const CS101_AppLay
  */
 CS101_AppLayerParameters
 CS104_Connection_getAppLayerParameters(CS104_Connection self);
+
+/**
+ * \brief Convenience function to set the originator address in the application layer parameters
+ *
+ * \note This function can be called multiple times to change the originator address while the connection is running.
+ *
+ * \param self CS104_Connection instance
+ * \param originatorAddress the originator address to set (0-255)
+ */
+void
+CS104_Connection_setOriginatorAddress(CS104_Connection self, uint8_t originatorAddress);
 
 /**
  * \brief Sets the timeout for connecting to the server (in ms)
@@ -267,7 +301,7 @@ CS104_Connection_sendTestCommandWithTimestamp(CS104_Connection self, int ca, uin
  *
  * \deprecated Use \ref CS104_Connection_sendProcessCommandEx instead
  *
- * \param typeId the type ID of the command message to send or 0 to use the type ID of the information object
+ * \param typeId this parameter is ignored
  * \param cot the cause of transmission (should be ACTIVATION to select/execute or ACT_TERM to cancel the command)
  * \param ca the common address of the information object
  * \param command the command information object (e.g. SingleCommand or DoubleCommand)

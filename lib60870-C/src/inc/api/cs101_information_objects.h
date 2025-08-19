@@ -852,6 +852,52 @@ void
 IntegratedTotalsWithCP56Time2a_setTimestamp(IntegratedTotalsWithCP56Time2a self,
         CP56Time2a value);
 
+/*************************************************************
+ * IntegratedTotalsForSecurityStatistics : InformationObject
+ *************************************************************/
+
+typedef struct sIntegratedTotalsForSecurityStatistics* IntegratedTotalsForSecurityStatistics;
+
+void
+IntegratedTotalsForSecurityStatistics_destroy(IntegratedTotalsForSecurityStatistics self);
+
+/**
+ * \brief Create a new instance of IntegratedTotalsForSecurityStatistics information object
+ *
+ * For message type: S_IT_TC_1 (41)
+ *
+ * \param self Reference to an existing instance to reuse, if NULL a new instance will we dynamically allocated
+ * \param ioa Information object address
+ * \param aid association ID
+ * \param value binary counter reading value and state
+*  \param timestamp timestamp of the reading
+ *
+ * \return Reference to the new instance
+ */
+IntegratedTotalsForSecurityStatistics
+IntegratedTotalsForSecurityStatistics_create(IntegratedTotalsForSecurityStatistics self, int ioa, uint16_t aid,
+        const BinaryCounterReading value, const CP56Time2a timestamp);
+
+uint16_t
+IntegratedTotalsForSecurityStatistics_getAID(IntegratedTotalsForSecurityStatistics self);
+
+void
+IntegratedTotalsForSecurityStatistics_setAID(IntegratedTotalsForSecurityStatistics self, uint16_t value);
+
+BinaryCounterReading
+IntegratedTotalsForSecurityStatistics_getBCR(IntegratedTotalsForSecurityStatistics self);
+
+void
+IntegratedTotalsForSecurityStatistics_setBCR(IntegratedTotalsForSecurityStatistics self, BinaryCounterReading value);
+
+CP56Time2a
+IntegratedTotalsForSecurityStatistics_getTimestamp(IntegratedTotalsForSecurityStatistics self);
+
+void
+IntegratedTotalsForSecurityStatistics_setTimestamp(IntegratedTotalsForSecurityStatistics self,
+        CP56Time2a value);
+
+
 /***********************************************************************
  * EventOfProtectionEquipment : InformationObject
  ***********************************************************************/

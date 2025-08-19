@@ -37,12 +37,14 @@ if(BUILD_HAL)
 
 if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-2.28)
 set(WITH_MBEDTLS 1)
+set(WITH_SEC_AUTH 1)
 message("mbedtls 2.28 found")
 ELSEIF(EXISTS ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-3.6)
 set(WITH_MBEDTLS3 1)
+set(WITH_SEC_AUTH 1)
 message("mbedtls 3.6 found")
 else()
-message("NOTE: mbedtls 2.28 or 3.6 is required for TLS support!")
+message("NOTE: mbedtls 2.28 or 3.6 is required for TLS support and secure authentication!")
 endif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-2.28)
 
 endif(BUILD_HAL)
@@ -114,6 +116,16 @@ endif(SUPPORT_REDUNDANT_DECLS)
 # write the detected stuff to this file
 # configure_file(config/lib60870_config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config/lib60870_config.h)
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src)
+
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/modules/sec-auth)
+
+add_compile_definitions(SEC_AUTH_60870_5_7)
+
+include(${CMAKE_CURRENT_LIST_DIR}/modules/sec-auth/CMakeLists.txt)
+
+endif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/modules/sec-auth)
+
 if(BUILD_EXAMPLES)
 	add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/examples)
 endif(BUILD_EXAMPLES)
@@ -121,8 +133,6 @@ endif(BUILD_EXAMPLES)
 if(BUILD_TESTS)
 	add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tests)
 endif(BUILD_TESTS)
-
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src)
 
 INSTALL(FILES ${API_HEADERS} DESTINATION include/lib60870 COMPONENT Development)
 

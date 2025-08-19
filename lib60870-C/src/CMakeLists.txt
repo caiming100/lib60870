@@ -59,6 +59,14 @@ set (lib_macos_SRCS
 
 endif (BUILD_HAL)
 
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/../modules/sec-auth)
+
+include(${CMAKE_CURRENT_LIST_DIR}/../modules/sec-auth/CMakeLists_src.txt)
+
+add_compile_definitions(SEC_AUTH_60870_5_7)
+
+endif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/../modules/sec-auth)
+
 IF(WIN32)
 
 IF(MSVC)

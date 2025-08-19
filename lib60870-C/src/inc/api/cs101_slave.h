@@ -35,6 +35,10 @@
 #include "iec60870_slave.h"
 #include "link_layer_parameters.h"
 
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_auth_60870_5_7.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -99,6 +103,21 @@ CS101_Slave_createEx(SerialPort serialPort, const LinkLayerParameters llParamete
  */
 void
 CS101_Slave_destroy(CS101_Slave self);
+
+#ifdef SEC_AUTH_60870_5_7
+
+/**
+ * \brief Set the secure endpoint for this slave instance
+ * 
+ * This function is used to enable secure authentication according to IEC 60870-5-7
+ * for the slave instance.
+ * 
+ * \param SecureEndpoint the secure endpoint to be used
+ */
+void
+CS101_Slave_setSecureEndpoint(CS101_Slave self, SecureEndpoint secureEndpoint);
+
+#endif /* SEC_AUTH_60870_5_7 */
 
 /**
  * \brief Set the value of the DIR bit when sending messages (only balanced mode)

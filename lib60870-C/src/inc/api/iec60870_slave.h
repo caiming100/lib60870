@@ -60,18 +60,7 @@ extern "C" {
 /**
  * \brief Interface to send messages to the master (used by slave)
  */
-typedef struct sIMasterConnection* IMasterConnection;
-
-struct sIMasterConnection {
-    bool (*isReady) (IMasterConnection self);
-    bool (*sendASDU) (IMasterConnection self, CS101_ASDU asdu);
-    bool (*sendACT_CON) (IMasterConnection self, CS101_ASDU asdu, bool negative);
-    bool (*sendACT_TERM) (IMasterConnection self, CS101_ASDU asdu);
-    void (*close) (IMasterConnection self);
-    int (*getPeerAddress) (IMasterConnection self, char* addrBuf, int addrBufSize);
-    CS101_AppLayerParameters (*getApplicationLayerParameters) (IMasterConnection self);
-    void* object;
-};
+typedef struct sIPeerConnection* IMasterConnection;
 
 /*
  * \brief Check if the connection is ready to send an ASDU.
@@ -175,10 +164,34 @@ typedef enum
  */
 typedef struct sCS101_SlavePlugin* CS101_SlavePlugin;
 
+typedef void (*CS101_PluginEnqueueFunc)(void* ctx, CS101_ASDU asdu);
+
+typedef void (*CS101_PluginForwardAsduFunc)(CS101_SlavePlugin plugin, void* ctx, CS101_ASDU asdu, void* connection);
+
 struct sCS101_SlavePlugin
 {
     CS101_SlavePlugin_Result (*handleAsdu) (void* parameter, IMasterConnection connection, CS101_ASDU asdu);
+    CS101_SlavePlugin_Result (*sendAsdu) (void* parameter, IMasterConnection connection, CS101_ASDU asdu);
+
+    //TODO check if function is required -> could be required to send security statistics (to all clients)
+    void (*setEnqueueFunction) (void* parameter, CS101_PluginEnqueueFunc func, void* ctx);
+
+    bool (*hasAsduToSend) (void* parameter);
+    Frame (*getNextAsduToSend) (void* parameter, Frame frame);
+
+    /**
+     * \brief Set the function to forward an ASDU from the plugin to the lib60870 slave instance
+     * 
+     * \param parameter user provided parameter
+     * \param func the function to forward an ASDU to lib60870 slave instance
+     * \param ctx context parameter that has to be passed to the function when called
+     */
+    void (*setForwardAsduFunction) (void* parameter, CS101_PluginForwardAsduFunc func, void* ctx);
+
     void (*runTask) (void* parameter, IMasterConnection connection);
+    void (*eventHandler)(void* parameter, IPeerConnection connection, int event); /* only be called when CS104 is used */
+
+    bool (*checkIfAsduAllowed) (void* parameter);
 
     void* parameter;
 };

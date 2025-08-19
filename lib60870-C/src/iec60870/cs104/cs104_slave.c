@@ -49,6 +49,10 @@
 #include "tls_socket.h"
 #endif
 
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_endpoint_int.h"
+#endif
+
 #if ((CONFIG_CS104_SUPPORT_SERVER_MODE_CONNECTION_IS_REDUNDANCY_GROUP != 1) &&                                         \
      (CONFIG_CS104_SUPPORT_SERVER_MODE_SINGLE_REDUNDANCY_GROUP != 1) &&                                                \
      (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS != 1))
@@ -81,22 +85,26 @@ MasterConnection_isActive(MasterConnection self);
 
 #define CS104_DEFAULT_PORT 2404
 
-static struct sCS104_APCIParameters defaultConnectionParameters = {
+static struct sCS104_APCIParameters defaultConnectionParameters =
+{
     /* .k = */ 12,
     /* .w = */ 8,
     /* .t0 = */ 10,
     /* .t1 = */ 15,
     /* .t2 = */ 10,
-    /* .t3 = */ 20};
+    /* .t3 = */ 20
+};
 
-static struct sCS101_AppLayerParameters defaultAppLayerParameters = {
+static struct sCS101_AppLayerParameters defaultAppLayerParameters =
+{
     /* .sizeOfTypeId =  */ 1,
     /* .sizeOfVSQ = */ 1,
     /* .sizeOfCOT = */ 2,
     /* .originatorAddress = */ 0,
     /* .sizeOfCA = */ 2,
     /* .sizeOfIOA = */ 3,
-    /* .maxSizeOfASDU = */ 249};
+    /* .maxSizeOfASDU = */ 249
+};
 
 typedef struct
 {
@@ -110,6 +118,17 @@ typedef enum
     QUEUE_ENTRY_STATE_WAITING_FOR_TRANSMISSION,
     QUEUE_ENTRY_STATE_SENT_BUT_NOT_CONFIRMED
 } QueueEntryState;
+
+static bool
+handleASDU(MasterConnection self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin);
+
+static void
+CS104_Slave_forwardASDU(CS101_SlavePlugin plugin, void* ctx, CS101_ASDU asdu, void* connection)
+{
+    IMasterConnection peerCon = (IMasterConnection)connection;
+
+    handleASDU((MasterConnection)(peerCon->object), asdu, plugin);
+}
 
 /***************************************************
  * MessageQueue
@@ -159,7 +178,6 @@ MessageQueue_create(int maxQueueSize)
 
     if (self)
     {
-
         self->size = maxQueueSize * (sizeof(struct sMessageQueueEntryInfo) + 256);
 
         DEBUG_PRINT("CS104 SLAVE: event queue buffer size: %i bytes\n", self->size);
@@ -181,7 +199,6 @@ MessageQueue_destroy(MessageQueue self)
 {
     if (self != NULL)
     {
-
 #if (CONFIG_USE_SEMAPHORES == 1)
         Semaphore_destroy(self->queueLock);
 #endif
@@ -234,7 +251,6 @@ MessageQueue_countEntriesUntilEndOfBuffer(MessageQueue self, uint8_t* firstEntry
 
     while (entryPtr)
     {
-
         struct sMessageQueueEntryInfo entryInfo;
 
         memcpy(&entryInfo, entryPtr, sizeof(struct sMessageQueueEntryInfo));
@@ -353,7 +369,7 @@ MessageQueue_enqueueASDU(MessageQueue self, CS101_ASDU asdu)
 }
 
 static bool
-MessageQueue_isAsduAvailable(MessageQueue self)
+MessageQueue_isAsduAvailable(MessageQueue self, TypeID* typeId)
 {
     bool retVal = false;
 
@@ -385,6 +401,13 @@ MessageQueue_isAsduAvailable(MessageQueue self)
 
         if (entryInfo.entryState == QUEUE_ENTRY_STATE_WAITING_FOR_TRANSMISSION)
         {
+            if (typeId)
+            {
+                uint8_t* buffer = entryPtr + sizeof(struct sMessageQueueEntryInfo);
+
+                *typeId = (TypeID)(buffer[0]);
+            }
+
             retVal = true;
         }
     }
@@ -999,13 +1022,17 @@ CS104_IPAddress_equals(CS104_IPAddress self, CS104_IPAddress other)
 
 struct sCS104_RedundancyGroup
 {
-
     char* name; /**< name of the group to be shown in debug messages, or NULL */
 
     MessageQueue asduQueue;                    /**< low priority ASDU queue and buffer */
     HighPriorityASDUQueue connectionAsduQueue; /**< high priority ASDU queue */
 
     LinkedList allowedClients;
+
+#ifdef SEC_AUTH_60870_5_7
+    SecureEndpoint secureEndpoint;
+    CS104_Slave slave;
+#endif
 };
 
 #if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
@@ -1043,6 +1070,11 @@ CS104_RedundancyGroup_create(const char* name)
         self->connectionAsduQueue = NULL;
 
         self->allowedClients = NULL;
+
+#ifdef SEC_AUTH_60870_5_7
+        self->secureEndpoint = NULL;
+        self->slave = NULL;
+#endif
     }
 
     return self;
@@ -1108,6 +1140,21 @@ CS104_RedundancyGroup_addAllowedClientEx(CS104_RedundancyGroup self, const uint8
         DEBUG_PRINT("CS104_SLAVE: failed to add allowed client");
     }
 }
+
+#ifdef SEC_AUTH_60870_5_7
+
+void
+CS104_RedundancyGroup_setSecureEndpoint(CS104_RedundancyGroup self, SecureEndpoint secureEndpoint)
+{
+    self->secureEndpoint = secureEndpoint;
+
+    if (self->slave)
+    {
+        SecureEndpoint_addForwardASDUFunctionForSlave(secureEndpoint, (CS101_PluginForwardAsduFunc)CS104_Slave_forwardASDU, self->slave);
+    }
+}
+
+#endif /* SEC_AUTH_60870_5_7 */
 
 static bool
 CS104_RedundancyGroup_matches(CS104_RedundancyGroup self, CS104_IPAddress ipAddress)
@@ -1191,8 +1238,7 @@ struct sCS104_Slave
     int maxHighPrioQueueSize;
 
     int openConnections; /**< number of connected clients */
-    MasterConnection
-        masterConnections[CONFIG_CS104_MAX_CLIENT_CONNECTIONS]; /**< references to all MasterConnection objects */
+    MasterConnection masterConnections[CONFIG_CS104_MAX_CLIENT_CONNECTIONS]; /**< references to all MasterConnection objects */
 
 #if (CONFIG_USE_SEMAPHORES == 1)
     Semaphore openConnectionsLock;
@@ -1233,6 +1279,10 @@ struct sCS104_Slave
     ServerSocket serverSocket;
 
     LinkedList plugins;
+
+#ifdef SEC_AUTH_60870_5_7
+    SecureEndpoint secureEndpoint;
+#endif
 };
 
 typedef struct
@@ -1252,8 +1302,8 @@ struct sMasterConnection
     TLSSocket tlsSocket;
 #endif
 
-    /* can be moved to CS104_Slave struct */
-    struct sIMasterConnection iMasterConnection;
+    /* can be moved to CS104_Slave struct? */
+    struct sIPeerConnection iMasterConnection;
 
     CS104_Slave slave;
 
@@ -1268,7 +1318,7 @@ struct sMasterConnection
     uint16_t sendCount;     /* sent messages - sequence counter */
     uint16_t receiveCount;  /* received messages - sequence counter */
 
-    int unconfirmedReceivedIMessages; /* number of unconfirmed messages received */
+    int unconfirmedReceivedIMessages; /* number of unconfirmed messages received (stateLock protected)*/
 
     /* timeout T2 handling */
     uint64_t lastConfirmationTime; /* timestamp when the last confirmation message (for I messages) was sent */
@@ -1517,7 +1567,7 @@ CS104_Slave_createSecure(int maxLowPrioQueueSize, int maxHighPrioQueueSize, TLSC
 {
     CS104_Slave self = createSlave(maxLowPrioQueueSize, maxHighPrioQueueSize);
 
-    if (self != NULL)
+    if (self)
     {
         self->tcpPort = 19998;
         self->tlsConfig = tlsConfig;
@@ -1526,6 +1576,16 @@ CS104_Slave_createSecure(int maxLowPrioQueueSize, int maxHighPrioQueueSize, TLSC
     return self;
 }
 #endif /* (CONFIG_CS104_SUPPORT_TLS == 1) */
+
+#ifdef SEC_AUTH_60870_5_7
+void
+CS104_Slave_setSecureEndpoint(CS104_Slave self, SecureEndpoint secureEndpoint)
+{
+    self->secureEndpoint = secureEndpoint;
+
+    SecureEndpoint_addForwardASDUFunctionForSlave(secureEndpoint, (CS101_PluginForwardAsduFunc)CS104_Slave_forwardASDU, self);
+}
+#endif /* SEC_AUTH_60870_5_7 */
 
 void
 CS104_Slave_addPlugin(CS104_Slave self, CS101_SlavePlugin plugin)
@@ -1656,7 +1716,6 @@ CS104_Slave_activate(CS104_Slave self, MasterConnection connectionToActivate)
 #if (CONFIG_CS104_SUPPORT_SERVER_MODE_SINGLE_REDUNDANCY_GROUP == 1)
     if (self->serverMode == CS104_MODE_SINGLE_REDUNDANCY_GROUP)
     {
-
         /* Deactivate all other connections */
 #if (CONFIG_USE_SEMAPHORES == 1)
         Semaphore_wait(self->openConnectionsLock);
@@ -1957,9 +2016,68 @@ isSentBufferFull(MasterConnection self)
         return false;
 }
 
-static void
+static bool
 sendASDU(MasterConnection self, uint8_t* buffer, int msgSize, uint64_t entryId, uint8_t* queueEntry)
 {
+#ifdef SEC_AUTH_60870_5_7
+
+    SecureEndpoint secureEndpoint = NULL;
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+
+    if (self->redundancyGroup)
+    {
+        if (self->redundancyGroup->secureEndpoint)
+            secureEndpoint = self->redundancyGroup->secureEndpoint;
+    }
+
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+    if ((secureEndpoint == NULL) && (self->slave->secureEndpoint != NULL))
+        secureEndpoint = self->slave->secureEndpoint;
+
+    if (secureEndpoint)
+    {
+        struct sCS101_ASDU _asdu;
+
+        CS101_ASDU asdu = CS101_ASDU_createFromBufferEx(&_asdu, &(self->slave->alParameters), buffer + 6, msgSize - 6);
+        
+        if (asdu)
+        {
+            if (SecureEndpoint_sendAsdu(secureEndpoint, &(self->iMasterConnection), asdu) == true)
+            {
+                return true;
+            }
+        }
+    }
+
+#endif /* SEC_AUTH_60870_5_7 */
+
+    /* call plugins */
+    if (self->slave->plugins)
+    {
+        struct sCS101_ASDU _asdu;
+
+        CS101_ASDU asdu = CS101_ASDU_createFromBufferEx(&_asdu, &(self->slave->alParameters), buffer + 6, msgSize - 6);
+        
+        if (asdu)
+        {
+            LinkedList pluginElem = LinkedList_getNext(self->slave->plugins);
+
+            while (pluginElem)
+            {
+                CS101_SlavePlugin plugin = (CS101_SlavePlugin) LinkedList_getData(pluginElem);
+
+                if (plugin->sendAsdu(plugin->parameter, &(self->iMasterConnection), asdu) == CS101_PLUGIN_RESULT_HANDLED)
+                {
+                    return false;
+                }
+
+                pluginElem = LinkedList_getNext(pluginElem);
+            }
+        }
+    }
+    
     int currentIndex = 0;
 
     if (self->oldestSentASDU == -1)
@@ -1980,6 +2098,8 @@ sendASDU(MasterConnection self, uint8_t* buffer, int msgSize, uint64_t entryId, 
     self->newestSentASDU = currentIndex;
 
     printSendBuffer(self);
+
+    return true;
 }
 
 static bool
@@ -1995,7 +2115,6 @@ sendASDUInternal(MasterConnection self, CS101_ASDU asdu)
 
         if (isSentBufferFull(self) == false)
         {
-
             FrameBuffer frameBuffer;
 
             struct sBufferFrame bufferFrame;
@@ -2070,7 +2189,7 @@ isBroadcastCA(CS104_Slave self, int ca)
  * \return true when ASDU is valid, false otherwise (e.g. corrupted message data)
  */
 static bool
-handleASDU(MasterConnection self, CS101_ASDU asdu)
+handleASDU(MasterConnection self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
 {
     bool messageHandled = false;
 
@@ -2091,6 +2210,43 @@ handleASDU(MasterConnection self, CS101_ASDU asdu)
         }
     }
 
+    /* handle test commands with invalid COT before the 62351-5 module gets them */
+    if (CS101_ASDU_getTypeID(asdu) == C_TS_TA_1)
+    {
+        if (CS101_ASDU_getCOT(asdu) != CS101_COT_ACTIVATION)
+        {
+            responseNegative(asdu, self, CS101_COT_UNKNOWN_COT);
+
+            return true;
+        }
+    }
+
+#ifdef SEC_AUTH_60870_5_7
+    SecureEndpoint secureEndpoint = NULL;
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+
+    if (self->redundancyGroup)
+    {
+        if (self->redundancyGroup->secureEndpoint)
+            secureEndpoint = self->redundancyGroup->secureEndpoint;
+    }
+
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+    if (secureEndpoint == NULL && slave->secureEndpoint != NULL)
+        secureEndpoint = slave->secureEndpoint;
+
+    if (secureEndpoint)
+    {
+        if (callingPlugin != SecureEndpoint_getSlavePlugin(secureEndpoint))
+        {
+            if (SecureEndpoint_asduReceived(secureEndpoint, &(self->iMasterConnection), asdu, NULL, 0) == true)
+                return true;
+        }
+    }
+#endif /* SEC_AUTH_60870_5_7 */
+
     /* call plugins */
     if (slave->plugins)
     {
@@ -2100,10 +2256,19 @@ handleASDU(MasterConnection self, CS101_ASDU asdu)
         {
             CS101_SlavePlugin plugin = (CS101_SlavePlugin)LinkedList_getData(pluginElem);
 
-            CS101_SlavePlugin_Result result = plugin->handleAsdu(plugin->parameter, &(self->iMasterConnection), asdu);
+            if (plugin != callingPlugin)
+            {
+                if (plugin->handleAsdu)
+                {
+                    CS101_SlavePlugin_Result result = plugin->handleAsdu(plugin->parameter, &(self->iMasterConnection), asdu);
 
-            if (result == CS101_PLUGIN_RESULT_HANDLED)
-                return true;
+                    if (result == CS101_PLUGIN_RESULT_HANDLED)
+                        return true;
+
+                    if (result == CS101_PLUGIN_RESULT_INVALID_ASDU)
+                        return false;
+                }
+            }
 
             pluginElem = LinkedList_getNext(pluginElem);
         }
@@ -2305,13 +2470,14 @@ handleASDU(MasterConnection self, CS101_ASDU asdu)
 
         if (isBroadcastCA(slave, ca) == true)
         {
-            DEBUG_PRINT("CS104_SLAVE: command with broadcast CA not allowed\n");
+            DEBUG_PRINT("CS104_SLAVE: test command with broadcast CA not allowed\n");
 
             responseNegative(asdu, self, CS101_COT_UNKNOWN_CA);
 
             return true;
         }
 
+        if (cot == CS101_COT_ACTIVATION)
         {
             union uInformationObject _io;
 
@@ -2327,17 +2493,7 @@ handleASDU(MasterConnection self, CS101_ASDU asdu)
                 }
                 else
                 {
-                    if (cot != CS101_COT_ACTIVATION)
-                    {
-                        DEBUG_PRINT("CS104 SLAVE: test command has invalid COT - should be ACTIVATION(6)\n");
-                        CS101_ASDU_setCOT(asdu, CS101_COT_UNKNOWN_COT);
-                        CS101_ASDU_setNegative(asdu, true);
-                    }
-                    else
-                    {
-                        CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
-                    }
-
+                    CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
                     sendASDUInternal(self, asdu);
                 }
             }
@@ -2347,6 +2503,12 @@ handleASDU(MasterConnection self, CS101_ASDU asdu)
                 return false;
             }
 
+            messageHandled = true;
+        }
+        else
+        {
+            DEBUG_PRINT("CS104 SLAVE: test command has invalid COT - should be ACTIVATION(6)\n");
+            responseCOTUnknown(asdu, self);
             messageHandled = true;
         }
 #else
@@ -2457,13 +2619,13 @@ handleASDU(MasterConnection self, CS101_ASDU asdu)
 
         if (isBroadcastCA(slave, ca) == true)
         {
-            DEBUG_PRINT("CS104_SLAVE: command with broadcast CA not allowed\n");
+            DEBUG_PRINT("CS104_SLAVE: test command with broadcast CA not allowed\n");
 
             responseNegative(asdu, self, CS101_COT_UNKNOWN_CA);
 
             return true;
         }
-
+        else
         {
             union uInformationObject _io;
 
@@ -2534,8 +2696,8 @@ checkSequenceNumber(MasterConnection self, int seqNo)
     bool counterOverflowDetected = false;
     int oldestValidSeqNo = -1;
 
-    if (self->oldestSentASDU == -1)
-    { /* if k-Buffer is empty */
+    if (self->oldestSentASDU == -1) /* if k-Buffer is empty */
+    {
         if (seqNo == self->sendCount)
             seqNoIsValid = true;
     }
@@ -2600,6 +2762,12 @@ checkSequenceNumber(MasterConnection self, int seqNo)
 
                     MessageQueue_unlock(self->lowPrioQueue);
                 }
+
+                /* clear sent buffer entry */
+                self->sentASDUs[self->oldestSentASDU].queueEntry = NULL;
+                self->sentASDUs[self->oldestSentASDU].entryId = 0;
+                self->sentASDUs[self->oldestSentASDU].sentTime = 0;
+                self->sentASDUs[self->oldestSentASDU].seqNo = -1;
 
                 if (oldestAsduSeqNo == seqNo)
                 {
@@ -2875,7 +3043,7 @@ handleMessage(MasterConnection self, uint8_t* buffer, int msgSize)
 
                 if (asdu)
                 {
-                    bool validAsdu = handleASDU(self, asdu);
+                    bool validAsdu = handleASDU(self, asdu, NULL);
 
                     if (validAsdu == false)
                     {
@@ -3018,7 +3186,6 @@ handleMessage(MasterConnection self, uint8_t* buffer, int msgSize)
                 return false;
             }
         }
-
         else
         {
             DEBUG_PRINT("CS104 SLAVE: unknown message - IGNORE\n");
@@ -3061,7 +3228,6 @@ MasterConnection_destroy(MasterConnection self)
 {
     if (self)
     {
-
         GLOBAL_FREEMEM(self->sentASDUs);
 
 #if (CONFIG_USE_SEMAPHORES == 1)
@@ -3109,10 +3275,14 @@ sendNextLowPriorityASDU(MasterConnection self)
 
         msgSize += IEC60870_5_104_APCI_LENGTH;
 
+        MessageQueue_unlock(self->lowPrioQueue);
+
         sendASDU(self, self->sendBuffer, msgSize, entryId, queueEntry);
     }
-
-    MessageQueue_unlock(self->lowPrioQueue);
+    else
+    {
+        MessageQueue_unlock(self->lowPrioQueue);
+    }
 
 exit_function:
 
@@ -3145,14 +3315,16 @@ sendNextHighPriorityASDU(MasterConnection self)
     {
         memcpy(self->sendBuffer + IEC60870_5_104_APCI_LENGTH, buffer, msgSize);
 
+        HighPriorityASDUQueue_unlock(self->highPrioQueue);
+
         msgSize += IEC60870_5_104_APCI_LENGTH;
 
-        sendASDU(self, self->sendBuffer, msgSize, 0, NULL);
-
-        retVal = true;
+        retVal = sendASDU(self, self->sendBuffer, msgSize, 0, NULL);
     }
-
-    HighPriorityASDUQueue_unlock(self->highPrioQueue);
+    else
+    {
+        HighPriorityASDUQueue_unlock(self->highPrioQueue);
+    }
 
 exit_function:
 #if (CONFIG_USE_SEMAPHORES == 1)
@@ -3171,21 +3343,115 @@ exit_function:
 static bool
 sendWaitingASDUs(MasterConnection self)
 {
-    /* send all available high priority ASDUs first */
-    while (HighPriorityASDUQueue_isAsduAvailable(self->highPrioQueue))
-    {
+#ifdef SEC_AUTH_60870_5_7
 
+    SecureEndpoint secureEndpoint = NULL;
+
+    secureEndpoint = self->slave->secureEndpoint;
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+
+    if (self->redundancyGroup)
+    {
+        if (self->redundancyGroup->secureEndpoint)
+            secureEndpoint = self->redundancyGroup->secureEndpoint;
+    }
+
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+    if (secureEndpoint)
+    {
+        if (SecureEndpoint_hasWaitingAsdu(secureEndpoint))
+        {
+            uint8_t buffer[256];
+            struct sBufferFrame _bufferFrame;
+            Frame bufferFrame = BufferFrame_initialize(&_bufferFrame, buffer, 0);
+
+            bool trySend = true;
+            bool sentBufferFull = false;
+
+            while (trySend)
+            {
+#if (CONFIG_USE_SEMAPHORES == 1)
+                Semaphore_wait(self->sentASDUsLock);
+#endif
+
+                if (isSentBufferFull(self) == false)
+                {
+                    bufferFrame = BufferFrame_initialize(&_bufferFrame, buffer, 0);
+
+                    Frame asdu = SecureEndpoint_getNextWaitingAsdu(secureEndpoint, bufferFrame);
+
+                    if (asdu)
+                    {
+                        int msgSize = Frame_getMsgSize(asdu);
+
+                        memcpy(self->sendBuffer + IEC60870_5_104_APCI_LENGTH, Frame_getBuffer(asdu), msgSize);
+
+                        msgSize += IEC60870_5_104_APCI_LENGTH;
+
+                        sendASDU(self, self->sendBuffer, msgSize, 0, NULL); 
+                    }
+                    else
+                    {
+                        trySend = false;
+                    }
+                }
+                else
+                {
+                    trySend = false;
+                    sentBufferFull = true;
+                }
+
+#if (CONFIG_USE_SEMAPHORES == 1)
+                Semaphore_post(self->sentASDUsLock);
+#endif
+
+                if (sentBufferFull)
+                    return true;     
+            }
+        }
+
+        /* check if M_EI_NA_1 is waiting and send when waiting */
+        TypeID typeId = (TypeID)0;
+        if (MessageQueue_isAsduAvailable(self->lowPrioQueue, &typeId) && (typeId == M_EI_NA_1))
+        {
+            sendNextLowPriorityASDU(self);
+        }
+
+        if (SecureEndpoint_sessionReady(secureEndpoint) == false)
+        {
+            return false;
+        }
+
+        if (SecureEndpoint_isChallengeInitialized(secureEndpoint) == false)
+        {
+            return false;
+        }
+    }
+
+#endif /* SEC_AUTH_60870_5_7 */
+
+    /* send all available high priority ASDUs first */
+    if (HighPriorityASDUQueue_isAsduAvailable(self->highPrioQueue))
+    {
         if (sendNextHighPriorityASDU(self) == false)
             return true;
 
         if (MasterConnection_isRunning(self) == false)
             return true;
+
+        if (HighPriorityASDUQueue_isAsduAvailable(self->highPrioQueue) ||  MessageQueue_isAsduAvailable(self->lowPrioQueue, NULL))
+            return true;
+
+        return false;
     }
 
     /* send messages from low-priority queue */
-    sendNextLowPriorityASDU(self);
+    if (MessageQueue_isAsduAvailable(self->lowPrioQueue, NULL))
+        sendNextLowPriorityASDU(self);
 
-    if (MessageQueue_isAsduAvailable(self->lowPrioQueue))
+    if (MessageQueue_isAsduAvailable(self->lowPrioQueue, NULL))
     {
         return true;
     }
@@ -3207,7 +3473,6 @@ handleTimeouts(MasterConnection self)
     {
         if (writeToSocket(self, TESTFR_ACT_MSG, TESTFR_ACT_MSG_SIZE) < 0)
         {
-
             DEBUG_PRINT("CS104 SLAVE: Failed to write TESTFR ACT message\n");
 #if (CONFIG_USE_SEMAPHORES == 1)
             Semaphore_wait(self->stateLock);
@@ -3249,7 +3514,6 @@ handleTimeouts(MasterConnection self)
     /* check timeout for others station I messages */
     if (self->unconfirmedReceivedIMessages > 0)
     {
-
         /* Check validity of last confirmation time */
         if (self->lastConfirmationTime != UINT64_MAX && self->lastConfirmationTime > currentTime)
         {
@@ -3280,7 +3544,6 @@ handleTimeouts(MasterConnection self)
     /* check if counterpart confirmed I message */
     if (self->oldestSentASDU != -1)
     {
-
         /* check validity of sent time */
 
         if (self->sentASDUs[self->oldestSentASDU].sentTime > currentTime)
@@ -3355,6 +3618,22 @@ connectionHandlingThread(void* parameter)
                                             CS104_CON_EVENT_CONNECTION_OPENED);
     }
 
+#ifdef SEC_AUTH_60870_5_7
+
+    if (self->slave->secureEndpoint)
+    {
+        SecureEndpoint_peerConnectionEvent(self->slave->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_CONNECTION_OPENED);
+    }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+    if (self->redundancyGroup && self->redundancyGroup->secureEndpoint)
+    {
+        SecureEndpoint_peerConnectionEvent(self->redundancyGroup->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_CONNECTION_OPENED);
+    }
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
+
     while (MasterConnection_isRunning(self))
     {
         Handleset_reset(self->handleSet);
@@ -3383,7 +3662,7 @@ connectionHandlingThread(void* parameter)
 
             if (bytesRec > 0)
             {
-                DEBUG_PRINT("CS104 SLAVE: Connection: rcvd msg(%i bytes)\n", bytesRec);
+                DEBUG_PRINT("CS104 SLAVE: Connection(%p): rcvd msg(%i bytes)\n", self, bytesRec);
 
                 if (self->slave->rawMessageHandler)
                     self->slave->rawMessageHandler(self->slave->rawMessageHandlerParameter, &(self->iMasterConnection),
@@ -3401,6 +3680,10 @@ connectionHandlingThread(void* parameter)
 #endif /* (CONFIG_USE_SEMAPHORES == 1) */
                 }
 
+#if (CONFIG_USE_SEMAPHORES == 1)
+                Semaphore_wait(self->stateLock);
+#endif /* (CONFIG_USE_SEMAPHORES == 1) */
+
                 if (self->unconfirmedReceivedIMessages >= self->slave->conParameters.w)
                 {
                     self->lastConfirmationTime = Hal_getMonotonicTimeInMs();
@@ -3409,8 +3692,12 @@ connectionHandlingThread(void* parameter)
 
                     self->timeoutT2Triggered = false;
 
-                    sendSMessage(self);
+                    _sendSMessage(self);
                 }
+
+#if (CONFIG_USE_SEMAPHORES == 1)
+                Semaphore_post(self->stateLock);
+#endif /* (CONFIG_USE_SEMAPHORES == 1) */
             }
         }
 
@@ -3435,6 +3722,27 @@ connectionHandlingThread(void* parameter)
             }
         }
 
+#ifdef SEC_AUTH_60870_5_7
+        if (self->slave->secureEndpoint)
+        {
+            if (SecureEndpoint_runTask(self->slave->secureEndpoint, &(self->iMasterConnection)) == false)
+            {
+                MasterConnection_close(self);
+            }
+        }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+        if (self->redundancyGroup && self->redundancyGroup->secureEndpoint)
+        {
+            if (SecureEndpoint_runTask(self->redundancyGroup->secureEndpoint, &(self->iMasterConnection)) == false)
+            {
+                MasterConnection_close(self);
+            }
+        }
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
+
         /* call plugins */
         if (self->slave->plugins)
         {
@@ -3456,6 +3764,22 @@ connectionHandlingThread(void* parameter)
         self->slave->connectionEventHandler(self->slave->connectionEventHandlerParameter, &(self->iMasterConnection),
                                             CS104_CON_EVENT_CONNECTION_CLOSED);
     }
+
+#ifdef SEC_AUTH_60870_5_7
+
+    if (self->slave->secureEndpoint)
+    {
+        SecureEndpoint_peerConnectionEvent(self->slave->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_CONNECTION_CLOSED);
+    }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+    if (self->redundancyGroup && self->redundancyGroup->secureEndpoint)
+    {
+        SecureEndpoint_peerConnectionEvent(self->redundancyGroup->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_CONNECTION_CLOSED);
+    }
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
 
 #if (CONFIG_USE_SEMAPHORES == 1)
     Semaphore_wait(self->stateLock);
@@ -3500,7 +3824,9 @@ _IMasterConnection_sendASDU(IMasterConnection self, CS101_ASDU asdu)
 {
     MasterConnection con = (MasterConnection)self->object;
 
-    return sendASDUInternal(con, asdu);
+    return HighPriorityASDUQueue_enqueue(con->highPrioQueue, asdu);
+
+    //return sendASDUInternal(con, asdu);
 }
 
 static bool
@@ -3574,7 +3900,7 @@ MasterConnection_create(CS104_Slave slave)
 {
     MasterConnection self = (MasterConnection)GLOBAL_CALLOC(1, sizeof(struct sMasterConnection));
 
-    if (self != NULL)
+    if (self)
     {
         self->state = M_CON_STATE_STOPPED;
         self->isUsed = false;
@@ -3659,7 +3985,7 @@ MasterConnection_init(MasterConnection self, Socket skt, MessageQueue lowPrioQue
         resetT3Timeout(self, Hal_getMonotonicTimeInMs());
 
 #if (CONFIG_CS104_SUPPORT_TLS == 1)
-        if (self->slave->tlsConfig != NULL)
+        if (self->slave->tlsConfig)
         {
             self->tlsSocket = TLSSocket_create(skt, self->slave->tlsConfig, false);
 
@@ -3745,6 +4071,24 @@ MasterConnection_close(MasterConnection self)
     self->isRunning = false;
     self->state = M_CON_STATE_STOPPED;
 
+#ifdef SEC_AUTH_60870_5_7
+
+    if (self->slave->secureEndpoint)
+    {
+        SecureEndpoint_peerConnectionEvent(self->slave->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_CONNECTION_CLOSED);
+    }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+
+    if (self->redundancyGroup && self->redundancyGroup->secureEndpoint)
+    {
+        SecureEndpoint_peerConnectionEvent(self->redundancyGroup->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_CONNECTION_CLOSED);
+    }
+
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
+
 #if (CONFIG_USE_SEMAPHORES == 1)
     Semaphore_post(self->stateLock);
 #endif /* (CONFIG_USE_SEMAPHORES == 1) */
@@ -3783,6 +4127,22 @@ MasterConnection_deactivate(MasterConnection self)
                 self->slave->connectionEventHandler(self->slave->connectionEventHandlerParameter,
                                                     &(self->iMasterConnection), CS104_CON_EVENT_DEACTIVATED);
             }
+
+#ifdef SEC_AUTH_60870_5_7
+
+            if (self->slave->secureEndpoint)
+            {
+                SecureEndpoint_peerConnectionEvent(self->slave->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_DEACTIVATED);
+            }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+            if (self->redundancyGroup && self->redundancyGroup->secureEndpoint)
+            {
+                SecureEndpoint_peerConnectionEvent(self->redundancyGroup->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_DEACTIVATED);
+            }
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
         }
     }
 
@@ -3807,6 +4167,22 @@ MasterConnection_activate(MasterConnection self)
             self->slave->connectionEventHandler(self->slave->connectionEventHandlerParameter,
                                                 &(self->iMasterConnection), CS104_CON_EVENT_ACTIVATED);
         }
+
+#ifdef SEC_AUTH_60870_5_7
+
+        if (self->slave->secureEndpoint)
+        {
+            SecureEndpoint_peerConnectionEvent(self->slave->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_ACTIVATED);
+        }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+        if (self->redundancyGroup && self->redundancyGroup->secureEndpoint)
+        {
+            SecureEndpoint_peerConnectionEvent(self->redundancyGroup->secureEndpoint, &(self->iMasterConnection), CS104_CON_EVENT_DEACTIVATED);
+        }
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
     }
 
     self->state = M_CON_STATE_STARTED;
@@ -3902,6 +4278,38 @@ handleClientConnections(CS104_Slave self)
 
                     DEBUG_PRINT("CS104 SLAVE: Connection closed\n");
 
+#ifdef SEC_AUTH_60870_5_7
+
+                    if (self->secureEndpoint)
+                    {
+                        SecureEndpoint_peerConnectionEvent(self->secureEndpoint, &(con->iMasterConnection), CS104_CON_EVENT_CONNECTION_CLOSED);
+                    }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+                    if (con->redundancyGroup && con->redundancyGroup->secureEndpoint)
+                    {
+                        SecureEndpoint_peerConnectionEvent(con->redundancyGroup->secureEndpoint, &(con->iMasterConnection), CS104_CON_EVENT_CONNECTION_CLOSED);
+                    }
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
+
+                    /* call plugins */
+                    if (self->plugins)
+                    {
+                        LinkedList pluginElem = LinkedList_getNext(self->plugins);
+
+                        while (pluginElem)
+                        {
+                            CS101_SlavePlugin plugin = (CS101_SlavePlugin) LinkedList_getData(pluginElem);
+
+                            if (plugin->eventHandler)
+                                plugin->eventHandler(plugin->parameter, &(self->masterConnections[i]->iMasterConnection), CS104_CON_EVENT_CONNECTION_CLOSED);
+
+                            pluginElem = LinkedList_getNext(pluginElem);
+                        }
+                    }
+
                     self->masterConnections[i]->isUsed = false;
 
                     MessageQueue_setWaitingForTransmissionWhenNotConfirmed(self->masterConnections[i]->lowPrioQueue);
@@ -3934,6 +4342,27 @@ handleClientConnections(CS104_Slave self)
             {
                 MasterConnection_executePeriodicTasks(con);
 
+#ifdef SEC_AUTH_60870_5_7
+                if (self->secureEndpoint)
+                {
+                    if (SecureEndpoint_runTask(self->secureEndpoint, &(con->iMasterConnection)) == false)
+                    {
+                        con->isRunning = false;
+                    }
+                }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+                if (con->redundancyGroup && con->redundancyGroup->secureEndpoint)
+                {
+                    if (SecureEndpoint_runTask(con->redundancyGroup->secureEndpoint, &(con->iMasterConnection)) == false)
+                    {
+                        con->isRunning = false;
+                    }
+                }
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
+
                 /* call plugins */
                 if (self->plugins)
                 {
@@ -3943,7 +4372,9 @@ handleClientConnections(CS104_Slave self)
                     {
                         CS101_SlavePlugin plugin = (CS101_SlavePlugin)LinkedList_getData(pluginElem);
 
-                        plugin->runTask(plugin->parameter, &(con->iMasterConnection));
+
+                        if (plugin->runTask)
+                            plugin->runTask(plugin->parameter, &(con->iMasterConnection));
 
                         pluginElem = LinkedList_getNext(pluginElem);
                     }
@@ -4067,7 +4498,7 @@ handleConnectionsThreadless(CS104_Slave self)
                 }
 #endif
 
-                MasterConnection connection = NULL;
+                MasterConnection con = NULL;
 
 #if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
                 if (self->serverMode == CS104_MODE_MULTIPLE_REDUNDANCY_GROUPS)
@@ -4086,11 +4517,11 @@ handleConnectionsThreadless(CS104_Slave self)
                             Semaphore_wait(self->openConnectionsLock);
 #endif
 
-                            connection = getFreeConnection(self);
+                            con = getFreeConnection(self);
 
-                            if (connection)
+                            if (con)
                             {
-                                if (MasterConnection_initEx(connection, newSocket, matchingGroup))
+                                if (MasterConnection_initEx(con, newSocket, matchingGroup))
                                 {
                                     self->openConnections++;
 
@@ -4101,8 +4532,8 @@ handleConnectionsThreadless(CS104_Slave self)
                                 }
                                 else
                                 {
-                                    connection->isUsed = false;
-                                    connection = NULL;
+                                    con->isUsed = false;
+                                    con = NULL;
                                 }
                             }
 
@@ -4126,29 +4557,29 @@ handleConnectionsThreadless(CS104_Slave self)
 #if (CONFIG_USE_SEMAPHORES)
                     Semaphore_wait(self->openConnectionsLock);
 #endif
-                    connection = getFreeConnection(self);
+                    con = getFreeConnection(self);
 
 #if (CONFIG_CS104_SUPPORT_SERVER_MODE_CONNECTION_IS_REDUNDANCY_GROUP == 1)
                     if (self->serverMode == CS104_MODE_CONNECTION_IS_REDUNDANCY_GROUP)
                     {
-                        lowPrioQueue = connection->lowPrioQueue;
+                        lowPrioQueue = con->lowPrioQueue;
                         MessageQueue_initialize(lowPrioQueue);
 
-                        highPrioQueue = connection->highPrioQueue;
+                        highPrioQueue = con->highPrioQueue;
                         HighPriorityASDUQueue_initialize(highPrioQueue);
                     }
 #endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
 
-                    if (connection)
+                    if (con)
                     {
-                        if (MasterConnection_init(connection, newSocket, lowPrioQueue, highPrioQueue))
+                        if (MasterConnection_init(con, newSocket, lowPrioQueue, highPrioQueue))
                         {
                             self->openConnections++;
                         }
                         else
                         {
-                            connection->isUsed = false;
-                            connection = NULL;
+                            con->isUsed = false;
+                            con = NULL;
                         }
                     }
 
@@ -4157,16 +4588,32 @@ handleConnectionsThreadless(CS104_Slave self)
 #endif
                 }
 
-                if (connection)
+                if (con)
                 {
-                    connection->isRunning = true;
+                    con->isRunning = true;
 
                     if (self->connectionEventHandler)
                     {
                         self->connectionEventHandler(self->connectionEventHandlerParameter,
-                                                     &(connection->iMasterConnection),
+                                                     &(con->iMasterConnection),
                                                      CS104_CON_EVENT_CONNECTION_OPENED);
                     }
+
+#ifdef SEC_AUTH_60870_5_7
+
+                    if (self->secureEndpoint)
+                    {
+                        SecureEndpoint_peerConnectionEvent(self->secureEndpoint, &(con->iMasterConnection), CS104_CON_EVENT_CONNECTION_OPENED);
+                    }
+
+#if (CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS == 1)
+                    if (con->redundancyGroup && con->redundancyGroup->secureEndpoint)
+                    {
+                        SecureEndpoint_peerConnectionEvent(con->redundancyGroup->secureEndpoint, &(con->iMasterConnection), CS104_CON_EVENT_CONNECTION_OPENED);
+                    }
+#endif /* CONFIG_CS104_SUPPORT_SERVER_MODE_MULTIPLE_REDUNDANCY_GROUPS */
+
+#endif /* SEC_AUTH_60870_5_7 */
                 }
                 else
                 {
@@ -4388,7 +4835,7 @@ serverThread(void* parameter)
         else
             Thread_sleep(10);
 
-            /* check if there are connections to close */
+        /* check if there are connections to close */
 #if (CONFIG_USE_SEMAPHORES == 1)
         Semaphore_wait(self->openConnectionsLock);
 #endif
@@ -4539,6 +4986,14 @@ CS104_Slave_addRedundancyGroup(CS104_Slave self, CS104_RedundancyGroup redundanc
     {
         if (self->redundancyGroups == NULL)
             self->redundancyGroups = LinkedList_create();
+
+#ifdef SEC_AUTH_60870_5_7
+        if (redundancyGroup->secureEndpoint)
+        {
+            redundancyGroup->slave = self;
+            SecureEndpoint_addForwardASDUFunctionForSlave(redundancyGroup->secureEndpoint, (CS101_PluginForwardAsduFunc)CS104_Slave_forwardASDU, self);
+        }
+#endif /* SEC_AUTH_60870_5_7 */
 
         LinkedList_add(self->redundancyGroups, redundancyGroup);
     }
@@ -4777,7 +5232,6 @@ CS104_Slave_stop(CS104_Slave self)
 
             for (i = 0; i < CONFIG_CS104_MAX_CLIENT_CONNECTIONS; i++)
             {
-
 #if (CONFIG_USE_SEMAPHORES == 1)
                 Semaphore_wait(self->openConnectionsLock);
 #endif

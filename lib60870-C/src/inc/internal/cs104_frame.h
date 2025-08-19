@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2022 Michael Zillgith
+ *  Copyright 2016-2024 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -26,10 +26,29 @@
 
 #include "frame.h"
 
+#ifndef CONFIG_LIB60870_STATIC_FRAMES
+#define CONFIG_LIB60870_STATIC_FRAMES 0
+#endif
+
+struct sT104Frame
+{
+    FrameVFT virtualFunctionTable;
+
+    uint8_t buffer[256];
+    int msgSize;
+
+#if (CONFIG_LIB60870_STATIC_FRAMES == 1)
+    uint8_t allocated;
+#endif
+};
+
 typedef struct sT104Frame* T104Frame;
 
 T104Frame
 T104Frame_create(void);
+
+T104Frame
+T104Frame_createEx(T104Frame self);
 
 void
 T104Frame_destroy(Frame self);

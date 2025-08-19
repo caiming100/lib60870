@@ -1,7 +1,7 @@
 /*
  *  cs101_queue.c
  *
- *  Copyright 2017-2018 MZ Automation GmbH
+ *  Copyright 2017-2025 MZ Automation GmbH
  *
  *  This file is part of lib60870-C
  *
@@ -148,7 +148,6 @@ CS101_Queue_enqueue(CS101_Queue self, CS101_ASDU asdu)
     CS101_Queue_unlock(self);
 }
 
-
 /*
  * NOTE: Locking has to be done by caller!
  */
@@ -157,9 +156,10 @@ CS101_Queue_dequeue(CS101_Queue self, Frame resultStorage)
 {
     Frame frame = NULL;
 
-    if (self->entryCounter != 0) {
-
-        if (resultStorage) {
+    if (self->entryCounter != 0)
+    {
+        if (resultStorage)
+        {
             frame = resultStorage;
 
             int currentIndex = self->firstMsgIndex;
@@ -174,6 +174,27 @@ CS101_Queue_dequeue(CS101_Queue self, Frame resultStorage)
     return frame;
 }
 
+/*
+ * NOTE: Locking has to be done by caller!
+ */
+bool
+CS101_Queue_hasWaitingAsdu(CS101_Queue self, TypeID* typeId)
+{
+    if (self->entryCounter != 0)
+    {
+        if (typeId)
+        {
+            int currentIndex = self->firstMsgIndex;
+
+            *typeId = (TypeID)(self->elements[currentIndex].buffer[0]);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 bool
 CS101_Queue_isFull(CS101_Queue self)
 {
@@ -186,7 +207,6 @@ CS101_Queue_isEmpty(CS101_Queue self)
    return (self->entryCounter == 0);
 }
 
-
 void
 CS101_Queue_flush(CS101_Queue self)
 {
@@ -196,7 +216,6 @@ CS101_Queue_flush(CS101_Queue self)
     self->lastMsgIndex = 0;
     CS101_Queue_unlock(self);
 }
-
 
 /********************************************
  * END CS101_Queue

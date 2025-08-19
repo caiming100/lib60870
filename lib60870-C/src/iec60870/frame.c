@@ -21,15 +21,18 @@
 
 #include "frame.h"
 #include "iec60870_common.h"
+#include <stddef.h>
 
 struct sFrame {
     FrameVFT virtualFunctionTable;
 };
 
-
 void
 Frame_destroy(Frame self)
 {
+    if (self->virtualFunctionTable->destroy == NULL)
+        return;
+
     self->virtualFunctionTable->destroy(self);
 }
 
@@ -62,7 +65,6 @@ Frame_getBuffer(Frame self)
 {
     return self->virtualFunctionTable->getBuffer(self);
 }
-
 
 int
 Frame_getSpaceLeft(Frame self)

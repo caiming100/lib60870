@@ -26,6 +26,10 @@
 
 #include "iec60870_slave.h"
 
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_auth_60870_5_7.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -80,7 +84,6 @@ typedef enum {
     CS104_CON_EVENT_DEACTIVATED = 3
 } CS104_PeerConnectionEvent;
 
-
 /**
  * \brief Handler that is called when a peer connection is established or closed, or START_DT/STOP_DT is issued
  *
@@ -104,7 +107,6 @@ typedef void (*CS104_ConnectionEventHandler) (void* parameter, IMasterConnection
  * \param sent indicates if the message was sent or received
  */
 typedef void (*CS104_SlaveRawMessageHandler) (void* parameter, IMasterConnection connection, uint8_t* msg, int msgSize, bool send);
-
 
 /**
  * \brief Create a new instance of a CS104 slave (server)
@@ -131,6 +133,11 @@ CS104_Slave_createSecure(int maxLowPrioQueueSize, int maxHighPrioQueueSize, TLSC
 
 void
 CS104_Slave_addPlugin(CS104_Slave self, CS101_SlavePlugin plugin);
+
+#ifdef SEC_AUTH_60870_5_7
+void
+CS104_Slave_setSecureEndpoint(CS104_Slave self, SecureEndpoint secureEndpoint);
+#endif /* SEC_AUTH_60870_5_7 */
 
 /**
  * \brief Set the local IP address to bind the server
@@ -379,6 +386,16 @@ CS104_RedundancyGroup_addAllowedClient(CS104_RedundancyGroup self, const char* i
  */
 void
 CS104_RedundancyGroup_addAllowedClientEx(CS104_RedundancyGroup self, const uint8_t* ipAddress, eCS104_IPAddressType addressType);
+
+#ifdef SEC_AUTH_60870_5_7
+/**
+ * \brief Set the secure endpoint for the redundancy group
+ * 
+ * \param secureEndpoint the secure endpoint to use
+ */
+void
+CS104_RedundancyGroup_setSecureEndpoint(CS104_RedundancyGroup self, SecureEndpoint secureEndpoint);
+#endif /* SEC_AUTH_60870_5_7 */
 
 /**
  * \brief Destroy the instance and release all resources.

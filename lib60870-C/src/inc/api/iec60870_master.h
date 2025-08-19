@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2022 Michael Zillgith
+ *  Copyright 2016-2025 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -51,6 +51,37 @@ extern "C" {
  * \return true if the ASDU has been handled by the callback, false otherwise
  */
 typedef bool (*CS101_ASDUReceivedHandler) (void* parameter, int address, CS101_ASDU asdu);
+
+/**
+ * \brief Plugin interface for CS101 or CS104 masters
+ */
+typedef struct sCS101_MasterPlugin* CS101_MasterPlugin;
+
+typedef struct sIPeerConnection* IPeerConnection;
+
+typedef enum
+{
+    CS101_MASTER_PLUGIN_RESULT_NOT_HANDLED = 0,
+    CS101_MASTER_PLUGIN_RESULT_HANDLED = 1,
+    CS101_MASTER_PLUGIN_RESULT_INVALID_ASDU = 2
+} CS101_MasterPlugin_Result;
+
+typedef void (*CS101_MasterPluginForwardAsduFunc)(CS101_MasterPlugin plugin, void* ctx, CS101_ASDU asdu);
+
+struct sCS101_MasterPlugin
+{
+    CS101_MasterPlugin_Result (*handleAsdu) (void* parameter, IPeerConnection connection, CS101_ASDU asdu);
+    CS101_MasterPlugin_Result (*sendAsdu) (void* parameter, IPeerConnection connection, CS101_ASDU asdu);
+    void (*eventHandler)(void* parameter, IPeerConnection connection, int event); /* only be called when CS104 is used */
+    void (*runTask) (void* parameter, IPeerConnection connection);
+
+     void (*setForwardAsduFunction) (void* parameter, CS101_MasterPluginForwardAsduFunc func, void* ctx);
+
+    //TODO check if this can be removed from master plugin
+    Frame (*getNextAsduToSend) (void* parameter, Frame frame);
+
+    void* parameter; /* parameter is set by the plugin and is used as the first parameter of all the plugin calls */
+};
 
 #ifdef __cplusplus
 }

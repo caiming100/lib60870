@@ -138,6 +138,10 @@ IntegratedTotalsWithCP56Time2a
 IntegratedTotalsWithCP56Time2a_getFromBuffer(IntegratedTotalsWithCP56Time2a self, CS101_AppLayerParameters parameters,
                                              uint8_t* msg, int msgSize, int startIndex, bool isSequence);
 
+IntegratedTotalsForSecurityStatistics
+IntegratedTotalsForSecurityStatistics_getFromBuffer(IntegratedTotalsForSecurityStatistics self, CS101_AppLayerParameters parameters,
+        uint8_t* msg, int msgSize, int startIndex, bool isSequence);
+
 EventOfProtectionEquipment
 EventOfProtectionEquipment_getFromBuffer(EventOfProtectionEquipment self, CS101_AppLayerParameters parameters,
                                          uint8_t* msg, int msgSize, int startIndex, bool isSequence);
@@ -657,8 +661,24 @@ struct sIntegratedTotalsWithCP56Time2a
     struct sCP56Time2a timestamp;
 };
 
-struct sEventOfProtectionEquipment
+struct sIntegratedTotalsForSecurityStatistics
 {
+
+    int objectAddress;
+
+    TypeID type;
+
+    InformationObjectVFT virtualFunctionTable;
+
+    uint16_t aid;
+
+    struct sBinaryCounterReading totals;
+
+    struct sCP56Time2a timestamp;
+};
+
+struct sEventOfProtectionEquipment {
+
     int objectAddress;
 
     TypeID type;

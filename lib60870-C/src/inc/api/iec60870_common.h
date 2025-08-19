@@ -455,6 +455,16 @@ void
 CS101_ASDU_setNumberOfElements(CS101_ASDU self, int numberOfElements);
 
 /**
+ * \brief Get the value of the VSQ (variable structure qualifier) field of the ASDU
+ *
+ * The VSQ field contains the number of information objects in the ASDU and the sequence flag
+ *
+ * \return the VSQ value
+ */
+uint8_t
+CS101_ASDU_getVSQ(CS101_ASDU self);
+
+/**
  * \brief Get the information object with the given index
  *
  * \param index the index of the information object (starting with 0)
@@ -867,6 +877,40 @@ BinaryCounterReading_setAdjusted(BinaryCounterReading self, bool value);
 
 void
 BinaryCounterReading_setInvalid(BinaryCounterReading self, bool value);
+
+typedef struct sIPeerConnection* IPeerConnection;
+
+struct sIPeerConnection {
+    bool (*isReady) (IPeerConnection self);
+    bool (*sendASDU) (IPeerConnection self, CS101_ASDU asdu);
+    bool (*sendACT_CON) (IPeerConnection self, CS101_ASDU asdu, bool negative);
+    bool (*sendACT_TERM) (IPeerConnection self, CS101_ASDU asdu);
+    void (*close) (IPeerConnection self);
+    int (*getPeerAddress) (IPeerConnection self, char* addrBuf, int addrBufSize);
+    CS101_AppLayerParameters (*getApplicationLayerParameters) (IPeerConnection self);
+    void* object;
+};
+
+bool
+IPeerConnection_isReady(IPeerConnection self);
+
+bool
+IPeerConnection_sendASDU(IPeerConnection self, CS101_ASDU asdu);
+
+bool
+IPeerConnection_sendACT_CON(IPeerConnection self, CS101_ASDU asdu, bool negative);
+
+bool
+IPeerConnection_sendACT_TERM(IPeerConnection self, CS101_ASDU asdu);
+
+CS101_AppLayerParameters
+IPeerConnection_getApplicationLayerParameters(IPeerConnection self);
+
+void
+IPeerConnection_close(IPeerConnection self);
+
+int
+IPeerConnection_getPeerAddress(IPeerConnection self, char* addrBuf, int addrBufSize);
 
 /**
  * @}
