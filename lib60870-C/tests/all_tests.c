@@ -6944,7 +6944,7 @@ test_CS104Slave_handleTestCommandWithTimestamp()
     /* send test command with correct COT but IOA != 0 */
     tc = TestCommandWithCP56Time2a_create(NULL, 0xaa55, &cpTime1);
     InformationObject_setObjectAddress((InformationObject)tc, 2);
-    asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION_CON, 0, 1, false, false);
+    asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
     CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
     TestCommandWithCP56Time2a_destroy(tc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
@@ -6970,7 +6970,7 @@ test_CS104Slave_handleTestCommandWithTimestamp()
 
     TEST_ASSERT_NOT_NULL(receivedASDU);
     TEST_ASSERT_EQUAL_INT(C_TS_TA_1, CS101_ASDU_getTypeID(receivedASDU));
-    TEST_ASSERT_EQUAL_INT(CS101_COT_UNKNOWN_IOA, CS101_ASDU_getCOT(receivedASDU));
+    TEST_ASSERT_EQUAL_INT(CS101_COT_UNKNOWN_COT, CS101_ASDU_getCOT(receivedASDU));
     TEST_ASSERT_TRUE(CS101_ASDU_isNegative(receivedASDU));
 
     CS104_Connection_close(con);
