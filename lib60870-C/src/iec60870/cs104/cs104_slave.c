@@ -1483,7 +1483,7 @@ createSlave(int maxLowPrioQueueSize, int maxHighPrioQueueSize)
 {
     CS104_Slave self = (CS104_Slave)GLOBAL_CALLOC(1, sizeof(struct sCS104_Slave));
 
-    if (self != NULL)
+    if (self)
     {
         self->conParameters = defaultConnectionParameters;
         self->alParameters = defaultAppLayerParameters;
@@ -1808,6 +1808,20 @@ CS104_Slave_setClockSyncHandler(CS104_Slave self, CS101_ClockSynchronizationHand
 {
     self->clockSyncHandler = handler;
     self->clockSyncHandlerParameter = parameter;
+}
+
+void
+CS104_Slave_setResetProcessHandler(CS104_Slave self, CS101_ResetProcessHandler handler, void* parameter)
+{
+    self->resetProcessHandler = handler;
+    self->resetProcessHandlerParameter = parameter;
+}
+
+void
+CS104_Slave_setDelayAcquisitionHandler(CS104_Slave self, CS101_DelayAcquisitionHandler handler, void* parameter)
+{
+    self->delayAcquisitionHandler = handler;
+    self->delayAcquisitionHandlerParameter = parameter;
 }
 
 void
@@ -2408,7 +2422,7 @@ handleASDU(MasterConnection self, CS101_ASDU asdu, CS101_SlavePlugin callingPlug
 
         if (cot == CS101_COT_ACTIVATION)
         {
-            if (slave->clockSyncHandler != NULL)
+            if (slave->clockSyncHandler)
             {
                 union uInformationObject _io;
 
@@ -2525,7 +2539,7 @@ handleASDU(MasterConnection self, CS101_ASDU asdu, CS101_SlavePlugin callingPlug
 
         if (cot == CS101_COT_ACTIVATION)
         {
-            if (slave->resetProcessHandler != NULL)
+            if (slave->resetProcessHandler)
             {
                 union uInformationObject _io;
 
@@ -2576,7 +2590,7 @@ handleASDU(MasterConnection self, CS101_ASDU asdu, CS101_SlavePlugin callingPlug
 
         if ((cot == CS101_COT_ACTIVATION) || (cot == CS101_COT_SPONTANEOUS))
         {
-            if (slave->delayAcquisitionHandler != NULL)
+            if (slave->delayAcquisitionHandler)
             {
                 union uInformationObject _io;
 
