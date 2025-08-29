@@ -1,3 +1,13 @@
+Changes to version 2.4.0
+------------------------
+
+- added integration code for secure authentication (IEC 60870-5-7) module
+- CS104 slave: added functions to set callback handlers for reset process and delay acquisition commands (#137)
+- CS101/CS104 slave: only allow known CAA for internally handled commands -> added callback CS101_IsCAAllowedHandler (LIB8705-126)
+- CS101/CS104 slave: reject commands with broadcast CA when not allowed for command type (LIB8705-130)
+- CS104 slave: fixed potentical deadlock - lowPrioQueue doesn't have to be locked during sendASDU call
+- CS104 slave: fixed detection of unconfirmed messages when connection is closed
+
 Changes to version 2.3.6
 ------------------------
 

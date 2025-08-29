@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2022 Michael Zillgith
+ *  Copyright 2016-2025 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -46,8 +46,8 @@ extern "C" {
 #define IEC_60870_5_104_DEFAULT_TLS_PORT 19998
 
 #define LIB60870_VERSION_MAJOR 2
-#define LIB60870_VERSION_MINOR 3
-#define LIB60870_VERSION_PATCH 6
+#define LIB60870_VERSION_MINOR 4
+#define LIB60870_VERSION_PATCH 0
 
 /**
  * \brief lib60870 version information
