@@ -5386,8 +5386,8 @@ test_version_number(void)
     Lib60870VersionInfo version = Lib60870_getLibraryVersionInfo();
 
     TEST_ASSERT_EQUAL_INT(2, version.major);
-    TEST_ASSERT_EQUAL_INT(3, version.minor);
-    TEST_ASSERT_EQUAL_INT(6, version.patch);
+    TEST_ASSERT_EQUAL_INT(4, version.minor);
+    TEST_ASSERT_EQUAL_INT(0, version.patch);
 }
 
 void
