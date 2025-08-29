@@ -3518,15 +3518,12 @@ handleTimeouts(MasterConnection self)
 #endif
 
     /* Check for TEST FR con timeout */
-    if (self->waitingForTestFRcon)
+    if (self->waitingForTestFRcon && checkTestFRConTimeout(self, currentTime))
     {
-        if (checkTestFRConTimeout(self, currentTime))
-        {
-            DEBUG_PRINT("CS104 SLAVE: Timeout for TESTFR CON message\n");
+        DEBUG_PRINT("CS104 SLAVE: Timeout for TESTFR CON message\n");
 
-            /* close connection */
-            timeoutsOk = false;
-        }
+        /* close connection */
+        timeoutsOk = false;
     }
 
     /* check timeout for others station I messages */

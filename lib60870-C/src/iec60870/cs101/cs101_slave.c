@@ -1046,9 +1046,19 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
 
                 if (irc)
                 {
-                    if (self->interrogationHandler(self->interrogationHandlerParameter, &(self->iMasterConnection),
-                                                   asdu, InterrogationCommand_getQOI(irc)))
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)irc) != 0)
+                    {
+                        DEBUG_PRINT("CS101 SLAVE: interrogation command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
                         messageHandled = true;
+                    }
+                    else
+                    {
+                        if (self->interrogationHandler(self->interrogationHandlerParameter, &(self->iMasterConnection),
+                                                    asdu, InterrogationCommand_getQOI(irc)))
+                            messageHandled = true;
+                    }
                 }
                 else
                 {
@@ -1057,7 +1067,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -1076,10 +1089,20 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
 
                 if (cic)
                 {
-                    if (self->counterInterrogationHandler(self->counterInterrogationHandlerParameter,
-                                                          &(self->iMasterConnection), asdu,
-                                                          CounterInterrogationCommand_getQCC(cic)))
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)cic) != 0)
+                    {
+                        DEBUG_PRINT("CS104 SLAVE: counter interrogation command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
                         messageHandled = true;
+                    }
+                    else
+                    {
+                        if (self->counterInterrogationHandler(self->counterInterrogationHandlerParameter,
+                                                            &(self->iMasterConnection), asdu,
+                                                            CounterInterrogationCommand_getQCC(cic)))
+                            messageHandled = true;
+                    }
                 }
                 else
                 {
@@ -1089,7 +1112,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -1127,7 +1153,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -1146,17 +1175,28 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
 
                 if (csc)
                 {
-                    if (self->clockSyncHandler(self->clockSyncHandlerParameter, &(self->iMasterConnection), asdu,
-                                               ClockSynchronizationCommand_getTime(csc)))
-                        messageHandled = true;
-
-                    if (messageHandled)
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)csc) != 0)
                     {
-                        /* send ACT-CON message */
-                        CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
-
-                        CS101_Slave_enqueueUserDataClass1(self, asdu);
+                        DEBUG_PRINT("CS104 SLAVE: time sync command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
                     }
+                    else
+                    {
+                        if (self->clockSyncHandler(self->clockSyncHandlerParameter, &(self->iMasterConnection), asdu,
+                                                ClockSynchronizationCommand_getTime(csc)))
+                            messageHandled = true;
+
+                        if (messageHandled)
+                        {
+                            /* send ACT-CON message */
+                            CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
+
+                            CS101_Slave_enqueueUserDataClass1(self, asdu);
+                        }
+                    }
+
+                    messageHandled = true;
                 }
                 else
                 {
@@ -1236,9 +1276,20 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
 
                 if (rpc)
                 {
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)rpc) != 0)
+                    {
+                        DEBUG_PRINT("CS104 SLAVE: reset process command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
+
+                        messageHandled = true;
+                    }
+                    else
+                    {
                     if (self->resetProcessHandler(self->resetProcessHandlerParameter, &(self->iMasterConnection), asdu,
                                                   ResetProcessCommand_getQRP(rpc)))
                         messageHandled = true;
+                    }
                 }
                 else
                 {
@@ -1247,7 +1298,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -1275,10 +1329,21 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
 
                 if (dac)
                 {
-                    if (self->delayAcquisitionHandler(self->delayAcquisitionHandlerParameter,
-                                                      &(self->iMasterConnection), asdu,
-                                                      DelayAcquisitionCommand_getDelay(dac)))
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)dac) != 0)
+                    {
+                        DEBUG_PRINT("CS104 SLAVE: delay aquisition command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
+
                         messageHandled = true;
+                    }
+                    else
+                    {
+                        if (self->delayAcquisitionHandler(self->delayAcquisitionHandlerParameter,
+                                                        &(self->iMasterConnection), asdu,
+                                                        DelayAcquisitionCommand_getDelay(dac)))
+                            messageHandled = true;
+                    }
                 }
                 else
                 {
@@ -1287,7 +1352,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
