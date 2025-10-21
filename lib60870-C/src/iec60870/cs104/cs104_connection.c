@@ -50,8 +50,7 @@ struct sCS104_APCIParameters defaultAPCIParameters = {
     /* .t0 = */ 10,
     /* .t1 = */ 15,
     /* .t2 = */ 10,
-    /* .t3 = */ 20
-};
+    /* .t3 = */ 20};
 
 static struct sCS101_AppLayerParameters defaultAppLayerParameters = {
     /* .sizeOfTypeId =  */ 1,
@@ -60,8 +59,7 @@ static struct sCS101_AppLayerParameters defaultAppLayerParameters = {
     /* .originatorAddress = */ 0,
     /* .sizeOfCA = */ 2,
     /* .sizeOfIOA = */ 3,
-    /* .maxSizeOfASDU = */ 249
-};
+    /* .maxSizeOfASDU = */ 249};
 
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 64
@@ -154,7 +152,21 @@ struct sCS104_Connection
 #ifdef SEC_AUTH_60870_5_7
     SecureEndpoint secureEndpoint;
 #endif
+
+    bool isThreadlessMode; /* true when started via CS104_Connection_startThreadless */
 };
+
+/* Forward prototypes for internal static functions referenced by threadless API before their definitions */
+static int
+receiveMessage(CS104_Connection self);
+static void
+confirmOutstandingMessages(CS104_Connection self);
+static bool
+checkMessage(CS104_Connection self, uint8_t* buffer, int msgSize);
+static bool
+handleTimeouts(CS104_Connection self);
+static bool
+isClose(CS104_Connection self);
 
 static uint8_t STARTDT_ACT_MSG[] = {0x68, 0x04, 0x07, 0x00, 0x00, 0x00};
 #define STARTDT_ACT_MSG_SIZE 6
@@ -235,8 +247,8 @@ _IPeerConnection_isReady(IPeerConnection self)
     if (con->conState != STATE_ACTIVE)
         return false;
 
-    //TODO: Implement this function
-    // check if send buffer is full
+    // TODO: Implement this function
+    //  check if send buffer is full
     return true;
 }
 
@@ -300,7 +312,6 @@ sendASDUInternal(CS104_Connection self, Frame frame)
 
     if (isRunning(self))
     {
-
 #if (CONFIG_USE_SEMAPHORES == 1)
         Semaphore_wait(self->conStateLock);
 #endif
@@ -326,7 +337,8 @@ sendASDUInternalNoLock(CS104_Connection self, Frame frame)
 {
     bool retVal = false;
 
-    /* TODO check if some kind of locking is required here? (in case the plugin is calling the send function outside of a callback)*/
+    /* TODO check if some kind of locking is required here? (in case the plugin is calling the send function outside of
+     * a callback)*/
     if (self->running)
     {
         if (isSentBufferFull(self) == false)
@@ -362,8 +374,8 @@ _IPeerConnection_close(IPeerConnection self)
 {
     CS104_Connection con = (CS104_Connection)self->object;
 
-    //CS104_Connection_close(con); // -> can this cause a deadlock?
-    // instead use
+    // CS104_Connection_close(con); // -> can this cause a deadlock?
+    //  instead use
     con->close = true;
 }
 
@@ -392,7 +404,7 @@ _IPeerConnection_getPeerAddress(IPeerConnection self, char* addrBuf, int addrBuf
     if (addrStr == NULL)
         return 0;
 
-    int len = (int) strlen(buf);
+    int len = (int)strlen(buf);
 
     if (len < addrBufSize)
     {
@@ -452,6 +464,7 @@ createConnection(const char* hostname, int tcpPort)
         self->sentASDUs = NULL;
 
         self->conState = STATE_IDLE;
+        self->isThreadlessMode = false;
 
         prepareSMessage(self->sMessage);
     }
@@ -505,13 +518,14 @@ CS104_Connection_forwardASDU(CS101_MasterPlugin callingPlugin, void* ctx, CS101_
 
         while (pluginElem)
         {
-            CS101_MasterPlugin plugin = (CS101_MasterPlugin) LinkedList_getData(pluginElem);
+            CS101_MasterPlugin plugin = (CS101_MasterPlugin)LinkedList_getData(pluginElem);
 
             if (plugin->handleAsdu)
             {
                 CS101_MasterPlugin_Result result = plugin->handleAsdu(plugin->parameter, NULL, asdu);
 
-                if (result == CS101_MASTER_PLUGIN_RESULT_HANDLED) {
+                if (result == CS101_MASTER_PLUGIN_RESULT_HANDLED)
+                {
                     return;
                 }
                 else if (result == CS101_MASTER_PLUGIN_RESULT_INVALID_ASDU)
@@ -538,7 +552,8 @@ CS104_Connection_addPlugin(CS104_Connection self, CS101_MasterPlugin plugin)
     if (self->plugins)
     {
         if (plugin->setForwardAsduFunction)
-            plugin->setForwardAsduFunction(plugin->parameter, (CS101_MasterPluginForwardAsduFunc)CS104_Connection_forwardASDU, self);
+            plugin->setForwardAsduFunction(plugin->parameter,
+                                           (CS101_MasterPluginForwardAsduFunc)CS104_Connection_forwardASDU, self);
 
         LinkedList_add(self->plugins, plugin);
     }
@@ -569,7 +584,7 @@ invokeConnectionHandler(CS104_Connection self, CS104_ConnectionEvent event)
 
 #endif /* SEC_AUTH_60870_5_7 */
 
-    //TODO remove dead code
+    // TODO remove dead code
 
     // /* call events for plugins */
     // if (self->plugins)
@@ -728,6 +743,7 @@ checkSequenceNumber(CS104_Connection self, int seqNo)
 void
 CS104_Connection_close(CS104_Connection self)
 {
+    /* if threadless mode we simply set close flag and let CS104_Connection_run handle resource cleanup */
 #if (CONFIG_USE_SEMAPHORES == 1)
     Semaphore_wait(self->conStateLock);
 #endif /* (CONFIG_USE_SEMAPHORES == 1) */
@@ -777,6 +793,221 @@ CS104_Connection_destroy(CS104_Connection self)
     }
 
     GLOBAL_FREEMEM(self);
+}
+
+bool
+CS104_Connection_isThreadless(CS104_Connection self)
+{
+    return self->isThreadlessMode;
+}
+
+/* Internal helper to perform socket connect similar to threaded path */
+static bool
+_CS104_Connection_establishSocket(CS104_Connection self)
+{
+    resetConnection(self);
+
+    self->socket = TcpSocket_create();
+    if (self->socket == NULL)
+        return false;
+
+    Socket_setConnectTimeout(self->socket, self->connectTimeoutInMs);
+
+    if (self->localIpAddress)
+        Socket_bind(self->socket, self->localIpAddress, self->localTcpPort);
+
+    if (!Socket_connect(self->socket, self->hostname, self->tcpPort))
+        return false;
+
+#if (CONFIG_USE_SEMAPHORES == 1)
+    Semaphore_wait(self->conStateLock);
+#endif
+
+#if (CONFIG_CS104_SUPPORT_TLS == 1)
+    if (self->tlsConfig != NULL)
+    {
+        self->tlsSocket = TLSSocket_create(self->socket, self->tlsConfig, false);
+        if (self->tlsSocket)
+            self->running = true;
+        else
+            self->failure = true;
+    }
+    else
+        self->running = true;
+#else
+    self->running = true;
+#endif
+
+    self->conState = STATE_INACTIVE;
+
+#if (CONFIG_USE_SEMAPHORES == 1)
+    Semaphore_post(self->conStateLock);
+#endif
+
+    invokeConnectionHandler(self, CS104_CONNECTION_OPENED);
+    return (self->failure == false) && (self->running == true);
+}
+
+bool
+CS104_Connection_startThreadless(CS104_Connection self)
+{
+    if (self->connectionHandlingThread) /* safety: don't allow both modes */
+        return false;
+
+    if (_CS104_Connection_establishSocket(self) == false)
+    {
+        /* cleanup if socket connect failed */
+        if (self->socket)
+        {
+            Socket_destroy(self->socket);
+            self->socket = NULL;
+        }
+        return false;
+    }
+
+    self->isThreadlessMode = true;
+    return true;
+}
+
+void
+CS104_Connection_stopThreadless(CS104_Connection self)
+{
+    if (self->isThreadlessMode == false)
+        return;
+
+#if (CONFIG_USE_SEMAPHORES == 1)
+    Semaphore_wait(self->conStateLock);
+#endif
+    /* Confirm outstanding messages before closing */
+    if (self->unconfirmedReceivedIMessages > 0)
+        confirmOutstandingMessages(self);
+
+    self->conState = STATE_IDLE;
+    self->running = false;
+    self->close = true;
+#if (CONFIG_USE_SEMAPHORES == 1)
+    Semaphore_post(self->conStateLock);
+#endif
+
+#if (CONFIG_CS104_SUPPORT_TLS == 1)
+    if (self->tlsSocket)
+    {
+        TLSSocket_close(self->tlsSocket);
+        self->tlsSocket = NULL;
+    }
+#endif
+    if (self->socket)
+    {
+        Socket_destroy(self->socket);
+        self->socket = NULL;
+    }
+
+    self->isThreadlessMode = false;
+    invokeConnectionHandler(self, CS104_CONNECTION_CLOSED);
+}
+
+bool
+CS104_Connection_run(CS104_Connection self, int timeoutMs)
+{
+    if (!self->isThreadlessMode || !self->running || self->socket == NULL)
+        return false;
+
+    bool continueLoop = true;
+
+    HandleSet handleSet = Handleset_new();
+    Handleset_reset(handleSet);
+    Handleset_addSocket(handleSet, self->socket);
+
+    int waitTime = (timeoutMs > 0) ? timeoutMs : 0;
+    if (Handleset_waitReady(handleSet, waitTime))
+    {
+        int bytesRec = receiveMessage(self);
+        if (bytesRec == -1)
+        {
+#if (CONFIG_USE_SEMAPHORES == 1)
+            Semaphore_wait(self->conStateLock);
+#endif
+            self->failure = true;
+#if (CONFIG_USE_SEMAPHORES == 1)
+            Semaphore_post(self->conStateLock);
+#endif
+            continueLoop = false;
+        }
+        else if (bytesRec > 0)
+        {
+            if (self->rawMessageHandler)
+                self->rawMessageHandler(self->rawMessageHandlerParameter, self->recvBuffer, bytesRec, false);
+
+#if (CONFIG_USE_SEMAPHORES == 1)
+            Semaphore_wait(self->conStateLock);
+#endif
+            CS104_ConState oldState = self->conState;
+            if (checkMessage(self, self->recvBuffer, bytesRec) == false)
+            {
+                self->failure = true;
+                continueLoop = false;
+            }
+            CS104_ConState newState = self->conState;
+#if (CONFIG_USE_SEMAPHORES == 1)
+            Semaphore_post(self->conStateLock);
+#endif
+            if (newState != oldState)
+            {
+                if (newState == STATE_ACTIVE)
+                    invokeConnectionHandler(self, CS104_CONNECTION_STARTDT_CON_RECEIVED);
+                else if (newState == STATE_INACTIVE)
+                    invokeConnectionHandler(self, CS104_CONNECTION_STOPDT_CON_RECEIVED);
+            }
+        }
+    }
+
+    /* confirmations */
+#if (CONFIG_USE_SEMAPHORES == 1)
+    Semaphore_wait(self->conStateLock);
+#endif
+    if ((self->unconfirmedReceivedIMessages >= self->parameters.w) || (self->conState == STATE_WAITING_FOR_STOPDT_CON))
+    {
+        confirmOutstandingMessages(self);
+    }
+#if (CONFIG_USE_SEMAPHORES == 1)
+    Semaphore_post(self->conStateLock);
+#endif
+
+    if (handleTimeouts(self) == false)
+        continueLoop = false;
+
+    if (isClose(self))
+        continueLoop = false;
+
+#ifdef SEC_AUTH_60870_5_7
+    if (self->secureEndpoint && self->conState == STATE_ACTIVE)
+    {
+        if (SecureEndpoint_runTask(self->secureEndpoint, &(self->peerConnection)) == false)
+            continueLoop = false;
+    }
+#endif
+
+    if (self->plugins)
+    {
+        LinkedList pluginElem = LinkedList_getNext(self->plugins);
+        while (pluginElem)
+        {
+            CS101_MasterPlugin plugin = (CS101_MasterPlugin)LinkedList_getData(pluginElem);
+            if (plugin->runTask)
+                plugin->runTask(plugin->parameter, &(self->peerConnection));
+            pluginElem = LinkedList_getNext(pluginElem);
+        }
+    }
+
+    Handleset_destroy(handleSet);
+
+    if (continueLoop == false)
+    {
+        /* perform cleanup similar to threaded path */
+        CS104_Connection_stopThreadless(self); /* will invoke CLOSED event */
+    }
+
+    return continueLoop;
 }
 
 void
@@ -1585,7 +1816,6 @@ CS104_Connection_sendStopDT(CS104_Connection self)
 #endif /* (CONFIG_USE_SEMAPHORES == 1) */
 }
 
-
 bool
 CS104_Connection_sendInterrogationCommand(CS104_Connection self, CS101_CauseOfTransmission cot, int ca,
                                           QualifierOfInterrogation qoi)
@@ -1624,7 +1854,7 @@ CS104_Connection_sendClockSyncCommand(CS104_Connection self, int ca, CP56Time2a 
 {
     struct sClockSynchronizationCommand _clockSyncCommand;
 
-    ClockSynchronizationCommand clockSyncCommand =  ClockSynchronizationCommand_create(&_clockSyncCommand, 0, newTime);
+    ClockSynchronizationCommand clockSyncCommand = ClockSynchronizationCommand_create(&_clockSyncCommand, 0, newTime);
 
     return CS104_Connection_sendProcessCommandEx(self, CS101_COT_ACTIVATION, ca, (InformationObject)clockSyncCommand);
 }
@@ -1665,7 +1895,7 @@ CS104_Connection_sendProcessCommandEx(CS104_Connection self, CS101_CauseOfTransm
     sCS101_StaticASDU sAsdu;
 
     CS101_ASDU asdu = CS101_ASDU_initializeStatic((CS101_StaticASDU)&sAsdu, &(self->alParameters), false, cot,
-        self->alParameters.originatorAddress, ca, false, false);
+                                                  self->alParameters.originatorAddress, ca, false, false);
 
     CS101_ASDU_addInformationObject(asdu, sc);
 

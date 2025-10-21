@@ -7,6 +7,7 @@ Changes to version 2.4.0
 - CS101/CS104 slave: reject commands with broadcast CA when not allowed for command type (LIB8705-130)
 - CS104 slave: fixed potentical deadlock - lowPrioQueue doesn't have to be locked during sendASDU call
 - CS104 slave: fixed detection of unconfirmed messages when connection is closed
+- CS104 client: added threadless operation mode (CS104_Connection_startThreadless/stopThreadless/run) and example cs104_client_no_threads (LIB8705-134)
 
 Changes to version 2.3.6
 ------------------------

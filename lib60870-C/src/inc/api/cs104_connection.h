@@ -395,6 +395,45 @@ CS104_Connection_close(CS104_Connection self);
 void
 CS104_Connection_destroy(CS104_Connection self);
 
+/**
+ * \brief Start the connection in threadless mode (no internal handling thread)
+ *
+ * Establishes the TCP (and optional TLS) connection and prepares internal state.
+ * The application must then periodically call \ref CS104_Connection_run to
+ * drive receive, timeout, plugin, and security tasks.
+ *
+ * \return true when connection successfully established and ready, false otherwise
+ */
+bool
+CS104_Connection_startThreadless(CS104_Connection self);
+
+/**
+ * \brief Stop a connection started in threadless mode and release socket/TLS resources
+ */
+void
+CS104_Connection_stopThreadless(CS104_Connection self);
+
+/**
+ * \brief Check if the connection is operating in threadless mode
+ *
+ * \return true when in threadless mode, false otherwise
+ */
+bool
+CS104_Connection_isThreadless(CS104_Connection self);
+
+/**
+ * \brief Execute one iteration of connection handling in threadless mode
+ *
+ * Waits up to timeoutMs for socket readiness, processes incoming/outgoing frames,
+ * handles protocol timeouts (T1/T2/T3), optional security endpoint, and plugin tasks.
+ *
+ * \param timeoutMs maximum time in milliseconds to wait for socket readiness (<=0 -> no wait)
+ *
+ * \return true while the connection remains active, false if connection closed or failed
+ */
+bool
+CS104_Connection_run(CS104_Connection self, int timeoutMs);
+
 /*! @} */
 
 /*! @} */
