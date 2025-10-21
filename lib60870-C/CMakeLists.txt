@@ -35,17 +35,24 @@ option(BUILD_TESTS "Build the tests" ON)
 
 if(BUILD_HAL)
 
-if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-2.28)
-set(WITH_MBEDTLS 1)
-set(WITH_SEC_AUTH 1)
-message("mbedtls 2.28 found")
-ELSEIF(EXISTS ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-3.6)
-set(WITH_MBEDTLS3 1)
-set(WITH_SEC_AUTH 1)
-message("mbedtls 3.6 found")
+## Detect mbedtls dependency folders. Accept folder names with patch/minor suffixes
+set(MBEDTLS_DIR "")
+file(GLOB MBEDTLS_2_28_CANDIDATES "${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-2.28*")
+file(GLOB MBEDTLS_3_6_CANDIDATES "${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-3.6*")
+
+if(MBEDTLS_2_28_CANDIDATES)
+	list(GET MBEDTLS_2_28_CANDIDATES 0 MBEDTLS_DIR)
+	set(WITH_MBEDTLS 1)
+	set(WITH_SEC_AUTH 1)
+	message("mbedtls 2.28 found: ${MBEDTLS_DIR}")
+elseif(MBEDTLS_3_6_CANDIDATES)
+	list(GET MBEDTLS_3_6_CANDIDATES 0 MBEDTLS_DIR)
+	set(WITH_MBEDTLS3 1)
+	set(WITH_SEC_AUTH 1)
+	message("mbedtls 3.6 found: ${MBEDTLS_DIR}")
 else()
-message("NOTE: mbedtls 2.28 or 3.6 is required for TLS support and secure authentication!")
-endif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-2.28)
+	message("NOTE: mbedtls 2.28 or 3.6 is required for TLS support and secure authentication!")
+endif()
 
 endif(BUILD_HAL)
 
@@ -58,31 +65,25 @@ include_directories(
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/inc
 )
 
-if(WITH_MBEDTLS)
-include_directories(
-    ${CMAKE_CURRENT_LIST_DIR}/src/hal/tls/mbedtls
-    ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-2.28/include
-)
+if(MBEDTLS_DIR)
+	# choose appropriate HAL adapter (mbedtls vs mbedtls3)
+	if(WITH_MBEDTLS3)
+		include_directories(
+			${CMAKE_CURRENT_LIST_DIR}/src/hal/tls/mbedtls3
+			${MBEDTLS_DIR}/include
+		)
+		file(GLOB tls_SRCS ${MBEDTLS_DIR}/library/*.c)
+	else()
+		include_directories(
+			${CMAKE_CURRENT_LIST_DIR}/src/hal/tls/mbedtls
+			${MBEDTLS_DIR}/include
+		)
+		file(GLOB tls_SRCS ${MBEDTLS_DIR}/library/*.c)
+	endif()
 
-file(GLOB tls_SRCS ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-2.28/library/*.c)
-
-add_definitions(-DCONFIG_CS104_SUPPORT_TLS=1)
-add_definitions(-DMBEDTLS_CONFIG_FILE="mbedtls_config.h")
-
-endif(WITH_MBEDTLS)
-
-if(WITH_MBEDTLS3)
-include_directories(
-	${CMAKE_CURRENT_LIST_DIR}/src/hal/tls/mbedtls3
-	${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-3.6/include
-)
-
-file(GLOB tls_SRCS ${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls-3.6/library/*.c)
-
-add_definitions(-DCONFIG_CS104_SUPPORT_TLS=1)
-add_definitions(-DMBEDTLS_CONFIG_FILE="mbedtls_config.h")
-
-endif(WITH_MBEDTLS3)
+	add_definitions(-DCONFIG_CS104_SUPPORT_TLS=1)
+	add_definitions(-DMBEDTLS_CONFIG_FILE="mbedtls_config.h")
+endif()
 
 
 set(API_HEADERS 
