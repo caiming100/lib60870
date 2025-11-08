@@ -1,6 +1,7 @@
 Changes to version 2.4.0
 ------------------------
 
+- updated minimum required cmake version to be compatible with cmake 4.0
 - added integration code for secure authentication (IEC 60870-5-7) module
 - CS104 slave: added functions to set callback handlers for reset process and delay acquisition commands (#137)
 - CS101/CS104 slave: only allow known CAA for internally handled commands -> added callback CS101_IsCAAllowedHandler (LIB8705-126)

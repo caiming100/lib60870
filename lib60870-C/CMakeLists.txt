@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.0...3.31)
 
 # automagically detect if we should cross-compile
 if(DEFINED ENV{TOOLCHAIN})
@@ -11,8 +11,8 @@ project(lib60870-C)
 ENABLE_TESTING()
 
 set(LIB_VERSION_MAJOR "2")
-set(LIB_VERSION_MINOR "3")
-set(LIB_VERSION_PATCH "5")
+set(LIB_VERSION_MINOR "4")
+set(LIB_VERSION_PATCH "0")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/third_party/cmake/modules/")
 
