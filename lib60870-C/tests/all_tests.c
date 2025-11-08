@@ -7267,6 +7267,100 @@ test_CS104Slave_handleResetProcessCommand()
     CS104_Slave_destroy(slave);
 }
 
+/*
+ * Test: Client sends TESTFR_ACT after T3 timeout when connection remains INACTIVE (no STARTDT)
+ * We start a server and a client in threadless mode, set a short T3 (2s), leave connection inactive,
+ * and poll both sides until we observe the TESTFR_ACT frame (0x68 0x04 0x43 00 00 00) received by the server.
+ */
+static uint8_t _testfr_frame[6];
+static bool _testfr_found = false;
+
+static void
+_testfr_rawHandler(void* parameter, IMasterConnection connection, uint8_t* msg, int msgSize, bool sent)
+{
+    (void)parameter;
+    (void)connection;
+
+    /* print raw frames for debugging */
+    {
+        char peerAddrBuf[128];
+        peerAddrBuf[0] = '\0';
+
+        if (connection) {
+            /* fill peer address string if available */
+            IMasterConnection_getPeerAddress(connection, peerAddrBuf, sizeof(peerAddrBuf));
+        }
+
+        printf("[RAW %s] size=%d peer=%s sent=%s\n",
+               (sent ? "SENT" : "RECV"),
+               msgSize,
+               (peerAddrBuf[0] != '\0' ? peerAddrBuf : "unknown"),
+               (sent ? "true" : "false"));
+
+        if (msg && msgSize > 0) {
+            printf("  data:");
+            for (int i = 0; i < msgSize; i++) {
+                printf(" %02x", msg[i]);
+            }
+            printf("\n");
+            fflush(stdout);
+        }
+    }
+
+    if (!sent && msgSize == 6 && msg[0] == 0x68 && msg[1] == 0x04 && msg[2] == 0x43)
+    {
+        memcpy(_testfr_frame, msg, 6);
+        _testfr_found = true;
+    }
+}
+
+void
+test_CS104_Connection_sendsTestFrAfterT3TimeoutInactive()
+{
+    _testfr_found = false;
+    memset(_testfr_frame, 0, sizeof(_testfr_frame));
+
+    /* Start slave in threadless mode */
+    CS104_Slave slave = CS104_Slave_create(5, 5);
+    TEST_ASSERT_NOT_NULL(slave);
+    CS104_Slave_setServerMode(slave, CS104_MODE_SINGLE_REDUNDANCY_GROUP);
+    CS104_Slave_setLocalPort(slave, 20014);
+    CS104_Slave_startThreadless(slave);
+    CS104_Slave_setRawMessageHandler(slave, _testfr_rawHandler, NULL);
+
+    /* Create client connection threadless with small T3 */
+    CS104_Connection con = CS104_Connection_create("127.0.0.1", 20014);
+    TEST_ASSERT_NOT_NULL(con);
+    CS104_APCIParameters p = CS104_Connection_getAPCIParameters(con);
+    p->t3 = 2; /* seconds */
+    p->t2 = 1; /* keep small just in case */
+    p->t1 = 3; /* arbitrary */
+    /* Establish socket in threadless mode */
+    TEST_ASSERT_TRUE_MESSAGE(CS104_Connection_startThreadless(con), "Failed to start threadless connection");
+
+    /* Loop until TESTFR_ACT observed or timeout (~5s) */
+    uint64_t start = Hal_getTimeInMs();
+    while (!_testfr_found && (Hal_getTimeInMs() - start) < 5500)
+    {
+        CS104_Slave_tick(slave);
+        CS104_Connection_run(con, 50); /* wait up to 50ms for client socket events */
+        Thread_sleep(20);
+    }
+
+    printf("TESTFR_ACT found=%s\n", (_testfr_found ? "true" : "false"));
+
+    TEST_ASSERT_TRUE_MESSAGE(_testfr_found, "Did not capture TESTFR_ACT after T3 timeout in inactive state");
+    TEST_ASSERT_EQUAL_UINT8(0x68, _testfr_frame[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x04, _testfr_frame[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x43, _testfr_frame[2]);
+
+    /* Cleanup */
+    CS104_Connection_stopThreadless(con);
+    CS104_Connection_destroy(con);
+    CS104_Slave_stopThreadless(slave);
+    CS104_Slave_destroy(slave);
+}
+
 int
 main(int argc, char** argv)
 {
@@ -7407,6 +7501,8 @@ main(int argc, char** argv)
     RUN_TEST(test_CS104Slave_rejectCommandWithUnknownCA);
 
     RUN_TEST(test_CS104Slave_handleResetProcessCommand);
+
+    RUN_TEST(test_CS104_Connection_sendsTestFrAfterT3TimeoutInactive);
 
     return UNITY_END();
 }
