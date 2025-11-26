@@ -5,6 +5,7 @@
 #include "hal_time.h"
 #include "hal_thread.h"
 #include "buffer_frame.h"
+#include "hal_socket.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -7361,6 +7362,92 @@ test_CS104_Connection_sendsTestFrAfterT3TimeoutInactive()
     CS104_Slave_destroy(slave);
 }
 
+static void*
+silent_server_thread(void* parameter)
+{
+    int port = 20005;
+    ServerSocket serverSocket = TcpServerSocket_create(NULL, port);
+
+    if (serverSocket)
+    {
+        ServerSocket_listen(serverSocket);
+
+        Socket clientSocket = NULL;
+        int retry = 0;
+
+        while (clientSocket == NULL && retry < 100) {
+            clientSocket = ServerSocket_accept(serverSocket);
+
+            if (clientSocket == NULL) {
+                Thread_sleep(10);
+                retry++;
+            }
+        }
+
+        if (clientSocket) {
+            uint8_t buffer[100];
+
+            /* Read START_DT ACT */
+            Socket_read(clientSocket, buffer, 100);
+
+            /* Do NOT send START_DT CON */
+
+            /* Wait longer than T1 (1s) */
+            Thread_sleep(2000);
+
+            Socket_destroy(clientSocket);
+        }
+
+        ServerSocket_destroy(serverSocket);
+    }
+
+    return NULL;
+}
+
+static CS104_ConnectionEvent test_CS104_Connection_StartDTTimeout_event = CS104_CONNECTION_OPENED;
+
+static void
+test_CS104_Connection_StartDTTimeout_connectionHandler (void* parameter, CS104_Connection connection, CS104_ConnectionEvent event)
+{
+    test_CS104_Connection_StartDTTimeout_event = event;
+}
+
+void
+test_CS104_Connection_StartDTTimeout(void)
+{
+    test_CS104_Connection_StartDTTimeout_event = CS104_CONNECTION_OPENED;
+
+    Thread serverThread = Thread_create(silent_server_thread, NULL, false);
+    Thread_start(serverThread);
+
+    Thread_sleep(100);
+
+    CS104_Connection con = CS104_Connection_create("127.0.0.1", 20005);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    CS104_APCIParameters apciParameters = CS104_Connection_getAPCIParameters(con);
+    apciParameters->t1 = 1;
+
+    CS104_Connection_setConnectionHandler(con, test_CS104_Connection_StartDTTimeout_connectionHandler, NULL);
+
+    bool connected = CS104_Connection_connect(con);
+
+    Thread_sleep(500);
+
+    TEST_ASSERT_TRUE(connected);
+
+    CS104_Connection_sendStartDT(con);
+
+    /* Wait for timeout (T1 = 1s) + some margin */
+    Thread_sleep(2000);
+
+    TEST_ASSERT_EQUAL_INT(CS104_CONNECTION_CLOSED, test_CS104_Connection_StartDTTimeout_event);
+
+    CS104_Connection_destroy(con);
+    Thread_destroy(serverThread);
+}
+
 int
 main(int argc, char** argv)
 {
@@ -7503,6 +7590,8 @@ main(int argc, char** argv)
     RUN_TEST(test_CS104Slave_handleResetProcessCommand);
 
     RUN_TEST(test_CS104_Connection_sendsTestFrAfterT3TimeoutInactive);
+
+    RUN_TEST(test_CS104_Connection_StartDTTimeout);
 
     return UNITY_END();
 }
