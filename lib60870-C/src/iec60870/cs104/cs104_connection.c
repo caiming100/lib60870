@@ -116,7 +116,7 @@ struct sCS104_Connection
     uint64_t lastConfirmationTime;
 
     uint64_t nextT3Timeout;
-    int outstandingTestFCConMessages;
+    int outstandingTestFRConMessages;
 
     uint64_t uMessageTimeout;
 
@@ -159,12 +159,16 @@ struct sCS104_Connection
 /* Forward prototypes for internal static functions referenced by threadless API before their definitions */
 static int
 receiveMessage(CS104_Connection self);
+
 static void
 confirmOutstandingMessages(CS104_Connection self);
+
 static bool
 checkMessage(CS104_Connection self, uint8_t* buffer, int msgSize);
+
 static bool
 handleTimeouts(CS104_Connection self);
+
 static bool
 isClose(CS104_Connection self);
 
@@ -642,7 +646,7 @@ resetConnection(CS104_Connection self)
         self->sentASDUs = (SentASDU*)GLOBAL_MALLOC(sizeof(SentASDU) * self->maxSentASDUs);
     }
 
-    self->outstandingTestFCConMessages = 0;
+    self->outstandingTestFRConMessages = 0;
     self->uMessageTimeout = 0;
 
     self->conState = STATE_IDLE;
@@ -1300,7 +1304,7 @@ checkMessage(CS104_Connection self, uint8_t* buffer, int msgSize)
         else if (buffer[2] == 0x83)
         { /* TESTFR_CON */
             DEBUG_PRINT("Rcvd TESTFR_CON\n");
-            self->outstandingTestFCConMessages = 0;
+            self->outstandingTestFRConMessages = 0;
         }
         else if (buffer[2] == 0x07)
         { /* STARTDT_ACT */
@@ -1357,7 +1361,7 @@ handleTimeouts(CS104_Connection self)
 
     if (currentTime > self->nextT3Timeout)
     {
-        if (self->outstandingTestFCConMessages > 2)
+        if (self->outstandingTestFRConMessages > 2)
         {
             DEBUG_PRINT("Timeout for TESTFR_CON message\n");
 
@@ -1372,7 +1376,7 @@ handleTimeouts(CS104_Connection self)
             writeToSocket(self, TESTFR_ACT_MSG, TESTFR_ACT_MSG_SIZE);
 
             self->uMessageTimeout = currentTime + (self->parameters.t1 * 1000);
-            self->outstandingTestFCConMessages++;
+            self->outstandingTestFRConMessages++;
 
             resetT3Timeout(self);
         }
