@@ -557,7 +557,7 @@ CS101_Slave_createEx(SerialPort serialPort, const LinkLayerParameters llParamete
                      const CS101_AppLayerParameters alParameters, IEC60870_LinkLayerMode linkLayerMode,
                      int class1QueueSize, int class2QueueSize)
 {
-    CS101_Slave self = (CS101_Slave)GLOBAL_MALLOC(sizeof(struct sCS101_Slave));
+    CS101_Slave self = (CS101_Slave)GLOBAL_CALLOC(1, sizeof(struct sCS101_Slave));
 
     if (self)
     {
