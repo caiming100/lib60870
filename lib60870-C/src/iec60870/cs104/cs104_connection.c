@@ -1318,8 +1318,6 @@ checkMessage(CS104_Connection self, uint8_t* buffer, int msgSize)
         { /* STARTDT_CON */
             DEBUG_PRINT("Received STARTDT_CON\n");
 
-            self->uMessageTimeout = 0;
-
             self->conState = STATE_ACTIVE;
         }
         else if (buffer[2] == 0x23)
@@ -1814,6 +1812,7 @@ CS104_Connection_sendStopDT(CS104_Connection self)
         confirmOutstandingMessages(self);
 
         self->conState = STATE_WAITING_FOR_STOPDT_CON;
+        self->uMessageTimeout = Hal_getMonotonicTimeInMs() + (self->parameters.t1 * 1000);
 
         writeToSocket(self, STOPDT_ACT_MSG, STOPDT_ACT_MSG_SIZE);
     }
