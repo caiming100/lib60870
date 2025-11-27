@@ -9,6 +9,7 @@ Changes to version 2.4.0
 - CS104 slave: fixed potentical deadlock - lowPrioQueue doesn't have to be locked during sendASDU call
 - CS104 slave: fixed detection of unconfirmed messages when connection is closed
 - CS104 client: added threadless operation mode (CS104_Connection_startThreadless/stopThreadless/run) and example cs104_client_no_threads (LIB8705-134)
+- CS104 client: implemented T1 timeout when waiting for STARTDT/STOPDT confirmation messages
 
 Changes to version 2.3.6
 ------------------------
