@@ -37,6 +37,10 @@
 #include "link_layer.h"
 #include "serial_transceiver_ft_1_2.h"
 
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_endpoint_int.h"
+#endif
+
 struct sCS101_Master
 {
     SerialPort serialPort;

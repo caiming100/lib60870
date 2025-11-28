@@ -44,6 +44,10 @@
 #include "information_objects_internal.h"
 #include "lib60870_internal.h"
 
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_endpoint_int.h"
+#endif
+
 struct sCS104_APCIParameters defaultAPCIParameters = {
     /* .k = */ 12,
     /* .w = */ 8,
@@ -341,8 +345,6 @@ sendASDUInternalNoLock(CS104_Connection self, Frame frame)
 {
     bool retVal = false;
 
-    /* TODO check if some kind of locking is required here? (in case the plugin is calling the send function outside of
-     * a callback)*/
     if (self->running)
     {
         if (isSentBufferFull(self) == false)
@@ -587,24 +589,6 @@ invokeConnectionHandler(CS104_Connection self, CS104_ConnectionEvent event)
     }
 
 #endif /* SEC_AUTH_60870_5_7 */
-
-    // TODO remove dead code
-
-    // /* call events for plugins */
-    // if (self->plugins)
-    // {
-    //     LinkedList pluginElem = LinkedList_getNext(self->plugins);
-
-    //     while (pluginElem)
-    //     {
-    //         CS101_MasterPlugin plugin = (CS101_MasterPlugin)LinkedList_getData(pluginElem);
-
-    //         if (plugin->eventHandler)
-    //             plugin->eventHandler(plugin->parameter, &(self->peerConnection), (int)event);
-
-    //         pluginElem = LinkedList_getNext(pluginElem);
-    //     }
-    // }
 
     if (self->connectionHandler)
         self->connectionHandler(self->connectionHandlerParameter, self, event);
