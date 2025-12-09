@@ -236,6 +236,12 @@ main(int argc, char** argv)
 
     SerialPort port = SerialPort_create(serialPort, 9600, 8, 'E', 1);
 
+    if (!port)
+    {
+        fprintf(stderr, "Failed to create serial port\n");
+        return 1;
+    }
+
     /* create a new slave/server instance with default link layer and application layer parameters */
     // CS101_Slave slave = CS101_Slave_create(port, NULL, NULL, IEC60870_LINK_LAYER_BALANCED);
     CS101_Slave slave = CS101_Slave_create(port, NULL, NULL, IEC60870_LINK_LAYER_UNBALANCED);
@@ -322,4 +328,6 @@ exit_program:
 
     SerialPort_close(port);
     SerialPort_destroy(port);
+
+    return 0;
 }

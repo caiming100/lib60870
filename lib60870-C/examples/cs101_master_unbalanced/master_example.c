@@ -262,4 +262,6 @@ main(int argc, char** argv)
 
     SerialPort_close(port);
     SerialPort_destroy(port);
+
+    return 0;
 }
