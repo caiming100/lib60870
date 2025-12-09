@@ -573,8 +573,6 @@ CS104_Connection_setSecureEndpoint(CS104_Connection self, SecureEndpoint secureE
 
     SecureEndpoint_addForwardASDUFunctionForMaster(secureEndpoint, CS104_Connection_forwardASDU, self);
 }
-#else
-#error "no sec auth"
 #endif /* SEC_AUTH_60870_5_7 */
 
 static void
