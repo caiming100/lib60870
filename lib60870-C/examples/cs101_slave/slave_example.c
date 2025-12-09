@@ -280,7 +280,11 @@ main(int argc, char** argv)
 
     uint64_t lastMessageSent = 0;
 
-    SerialPort_open(port);
+    if (!SerialPort_open(port))
+    {
+        fprintf(stderr, "Failed to open serial port\n");
+        return 1;
+    }
 
     while (running)
     {

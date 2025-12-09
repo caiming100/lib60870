@@ -171,7 +171,11 @@ main(int argc, char** argv)
     CS101_Master_addSlave(master, 1);
     CS101_Master_addSlave(master, 2);
 
-    SerialPort_open(port);
+    if (!SerialPort_open(port))
+    {
+        fprintf(stderr, "Failed to open serial port\n");
+        return 1;
+    }
 
     running = true;
 
