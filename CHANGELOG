@@ -1,6 +1,8 @@
 Changes to version 2.4.0
 ------------------------
 
+- Added function CS104_Connection_isConnected
+- TLS integration code for mbedtls 2.28 and 3.6 updated for better compliance with IEC 62351 security event requirements
 - updated minimum required cmake version to be compatible with cmake 4.0
 - added integration code for secure authentication (IEC 60870-5-7) module
 - CS104 slave: added functions to set callback handlers for reset process and delay acquisition commands (#137)

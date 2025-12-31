@@ -9268,43 +9268,43 @@ test_CS104_Connection_isRunning(void)
 
     CS104_Connection con = CS104_Connection_create("127.0.0.1", 20004);
 
-    TEST_ASSERT_FALSE(CS104_Connection_isRunning(con));
+    TEST_ASSERT_FALSE(CS104_Connection_isConnected(con));
 
     bool result = CS104_Connection_connect(con);
     TEST_ASSERT_TRUE(result);
 
-    TEST_ASSERT_TRUE(CS104_Connection_isRunning(con));
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
 
     CS104_Connection_sendStartDT(con);
 
     Thread_sleep(500);
 
-    TEST_ASSERT_TRUE(CS104_Connection_isRunning(con));
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
 
     CS104_Connection_sendStopDT(con);
 
     Thread_sleep(500);
 
-    TEST_ASSERT_TRUE(CS104_Connection_isRunning(con));
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
 
     CS104_Connection_close(con);
 
-    TEST_ASSERT_FALSE(CS104_Connection_isRunning(con));
+    TEST_ASSERT_FALSE(CS104_Connection_isConnected(con));
 
     result = CS104_Connection_connect(con);
     TEST_ASSERT_TRUE(result);
 
-    TEST_ASSERT_TRUE(CS104_Connection_isRunning(con));
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
 
     CS104_Connection_sendStartDT(con);
 
     Thread_sleep(500);
 
-    TEST_ASSERT_TRUE(CS104_Connection_isRunning(con));
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
 
     CS104_Connection_close(con);
 
-    TEST_ASSERT_FALSE(CS104_Connection_isRunning(con));
+    TEST_ASSERT_FALSE(CS104_Connection_isConnected(con));
 
     CS104_Connection_destroy(con);
 

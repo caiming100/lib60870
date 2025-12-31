@@ -199,13 +199,13 @@ bool
 CS104_Connection_connect(CS104_Connection self);
 
 /**
- * \brief Check if the connection is currently running
+ * \brief Check if the connection object is currently connected to a slave/server
  *
  * \param self CS104_Connection instance
- * \return true if the connection is running, false otherwise
+ * \return true if connected, false otherwise
  */
 bool
-CS104_Connection_isRunning(CS104_Connection self);
+CS104_Connection_isConnected(CS104_Connection self);
 
 /**
  * \brief start data transmission on this connection

@@ -314,7 +314,7 @@ isRunning(CS104_Connection self)
 }
 
 bool
-CS104_Connection_isRunning(CS104_Connection self)
+CS104_Connection_isConnected(CS104_Connection self)
 {
     return isRunning(self);
 }
