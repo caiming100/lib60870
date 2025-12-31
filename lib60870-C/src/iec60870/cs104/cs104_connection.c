@@ -313,6 +313,12 @@ isRunning(CS104_Connection self)
     return isRunning;
 }
 
+bool
+CS104_Connection_isRunning(CS104_Connection self)
+{
+    return isRunning(self);
+}
+
 static bool
 sendASDUInternal(CS104_Connection self, Frame frame)
 {

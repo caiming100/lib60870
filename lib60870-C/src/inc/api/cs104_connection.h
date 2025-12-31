@@ -199,6 +199,15 @@ bool
 CS104_Connection_connect(CS104_Connection self);
 
 /**
+ * \brief Check if the connection is currently running
+ *
+ * \param self CS104_Connection instance
+ * \return true if the connection is running, false otherwise
+ */
+bool
+CS104_Connection_isRunning(CS104_Connection self);
+
+/**
  * \brief start data transmission on this connection
  *
  * After issuing this command the client (master) will receive spontaneous
