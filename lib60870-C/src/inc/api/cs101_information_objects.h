@@ -213,7 +213,7 @@ typedef uint8_t QualifierOfParameterActivation;
 #define IEC60870_QPA_NOT_USED 0
 #define IEC60870_QPA_DE_ACT_PREV_LOADED_PARAMETER 1
 #define IEC60870_QPA_DE_ACT_OBJECT_PARAMETER 2
-#define IEC60870_QPA_DE_ACT_OBJECT_TRANSMISSION 4
+#define IEC60870_QPA_DE_ACT_OBJECT_TRANSMISSION 3
 
 
 typedef uint8_t SetpointCommandQualifier;
