@@ -62,10 +62,10 @@ typedef enum {
 
 /**
  * \brief Convert TLS version number to string
- * 
+ *
  * \param version TLS version number
- * 
- * \return the TLS version as null terminated string 
+ *
+ * \return the TLS version as null terminated string
  */
 PAL_API const char*
 TLSConfigVersion_toString(TLSConfigVersion version);
@@ -96,36 +96,40 @@ typedef enum {
 #define TLS_EVENT_CODE_WRN_CERT_NOT_YET_VALID 18
 #define TLS_EVENT_CODE_WRN_CRL_EXPIRED 19
 #define TLS_EVENT_CODE_WRN_CRL_NOT_YET_VALID 20
+#define TLS_EVENT_CODE_ALM_TLS_VERSION_CHANGE 21
+#define TLS_EVENT_CODE_WRN_MIN_KEY_LENGTH 22
+#define TLS_EVENT_CODE_ALM_INSUFFICIENT_KEY_LENGTH 23
+#define TLS_EVENT_CODE_WRN_CRL_NOT_ACCESSIBLE 24
 
 typedef struct sTLSConnection* TLSConnection;
 
 /**
  * \brief Get the peer address of the TLS connection
- * 
+ *
  * \param self the TLS connection instance
  * \param peerAddrBuf user provided buffer that can hold at least 60 characters, or NULL to allow the function to allocate the memory for the buffer
- * 
- * \returns peer address:port as null terminated string 
+ *
+ * \returns peer address:port as null terminated string
  */
 PAL_API char*
 TLSConnection_getPeerAddress(TLSConnection self, char* peerAddrBuf);
 
 /**
  * \brief Get the TLS certificate used by the peer
- * 
+ *
  * \param self the TLS connection instance
  * \param certSize[OUT] the certificate size in bytes
- * 
- * \return address of the certificate buffer 
+ *
+ * \return address of the certificate buffer
  */
 PAL_API uint8_t*
 TLSConnection_getPeerCertificate(TLSConnection self, int* certSize);
 
 /**
  * \brief Get the TLS version used by the connection
- * 
+ *
  * \param self the TLS connection instance
- * 
+ *
  * \return TLS version
  */
 PAL_API TLSConfigVersion
@@ -135,7 +139,7 @@ typedef void (*TLSConfiguration_EventHandler)(void* parameter, TLSEventLevel eve
 
 /**
  * \brief Set the security event handler
- * 
+ *
  * \param handler the security event callback handler
  * \param parameter user provided parameter to be passed to the callback handler
  */
@@ -144,10 +148,10 @@ TLSConfiguration_setEventHandler(TLSConfiguration self, TLSConfiguration_EventHa
 
 /**
  * \brief enable or disable TLS session resumption (default: enabled)
- * 
+ *
  * NOTE: Depending on the used TLS version this is implemented by
  * session IDs or by session tickets.
- * 
+ *
  * \param enable true to enable session resumption, false otherwise
  */
 PAL_API void
@@ -291,6 +295,14 @@ TLSConfiguration_setMinTlsVersion(TLSConfiguration self, TLSConfigVersion versio
  */
 PAL_API void
 TLSConfiguration_setMaxTlsVersion(TLSConfiguration self, TLSConfigVersion version);
+
+/**
+ * \brief Set the minimum allowed public key length in bits (smaller keys will cause certificate validation to fail)
+ *
+ * \param keyLengthInBits minimum key length in bits
+ */
+PAL_API void
+TLSConfiguration_setMinimumKeyLength(TLSConfiguration self, int keyLengthInBits);
 
 /**
  * \brief Add a CRL (certificate revocation list) from buffer

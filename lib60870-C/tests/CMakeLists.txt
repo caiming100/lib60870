@@ -38,6 +38,13 @@ configure_file(certs/client_CA1_4.pem client_CA1_4.pem COPYONLY)
 configure_file(certs/server_CA1_1_chain.pem server_CA1_1_chain.pem)
 
 configure_file(certs/test.crl test.crl COPYONLY)
+configure_file(certs/test_initial.crl test_initial.crl COPYONLY)
+
+configure_file(certs/client_CA1_badsig.key client_CA1_badsig.key COPYONLY)
+configure_file(certs/client_CA1_badsig.pem client_CA1_badsig.pem COPYONLY)
+
+configure_file(certs/client_CA1_weak.key client_CA1_weak.key COPYONLY)
+configure_file(certs/client_CA1_weak.pem client_CA1_weak.pem COPYONLY)
 
 add_executable(tests
   ${tests_SRCS}
