@@ -1548,6 +1548,9 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
             }
         }
 
+        /* disable host name verification */
+        mbedtls_ssl_set_hostname(&(self->ssl), NULL);
+
         while ((ret = mbedtls_ssl_handshake(&(self->ssl))) != 0)
         {
             if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE)
