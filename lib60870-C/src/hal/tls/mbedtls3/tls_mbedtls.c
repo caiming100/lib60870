@@ -1262,8 +1262,8 @@ createSecurityEvents(TLSConfiguration config, int ret, uint32_t flags, TLSSocket
         break;
 
     case MBEDTLS_ERR_SSL_BAD_PROTOCOL_VERSION:
-        raiseSecurityEvent(config, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_HANDSHAKE_FAILED_UNKNOWN_REASON,
-                           "Alarm: Bad protocol version", socket);
+        raiseSecurityEvent(config, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_UNSECURE_COMMUNICATION,
+                           "Alarm: Unsecure communication", socket);
         break;
 
     case MBEDTLS_ERR_SSL_BAD_CERTIFICATE:

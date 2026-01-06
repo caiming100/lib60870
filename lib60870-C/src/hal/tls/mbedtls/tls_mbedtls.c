@@ -3,7 +3,7 @@
  *
  * TLS API for TCP/IP protocol stacks
  *
- * Copyright 2017-2025 Michael Zillgith
+ * Copyright 2017-2026 Michael Zillgith
  *
  * Implementation of the TLS abstraction layer for mbedtls
  *
@@ -145,6 +145,8 @@ struct sTLSSocket
     bool versionMismatchDetected;
     struct TLSCacheAccessor* cacheAccessor;
     bool handshakeInProgress;
+
+    TLSConfigVersion currentTLSVersion;
 };
 
 struct TLSCacheAccessor
@@ -519,6 +521,24 @@ crlAvailableForCert(TLSConfiguration cfg, const mbedtls_x509_crt* crt)
     return false;
 }
 
+static bool
+isCAAvailableForCert(TLSConfiguration cfg, const mbedtls_x509_crt* crt)
+{
+    mbedtls_x509_crt* caCerts = &(cfg->cacerts);
+
+    while (caCerts && caCerts->version != 0)
+    {
+        if (caCerts->subject_raw.len == crt->issuer_raw.len &&
+            memcmp(caCerts->subject_raw.p, crt->issuer_raw.p, caCerts->subject_raw.len) == 0)
+        {
+            return true;
+        }
+        caCerts = caCerts->next;
+    }
+
+    return false;
+}
+
 static int
 verifyCertificate(void* parameter, mbedtls_x509_crt* crt, int certificate_depth, uint32_t* flags)
 {
@@ -601,6 +621,18 @@ verifyCertificate(void* parameter, mbedtls_x509_crt* crt, int certificate_depth,
 
                 *flags |= MBEDTLS_X509_BADCERT_OTHER;
                 return 1;
+            }
+        }
+
+        if (self->tlsConfig->chainValidation)
+        {
+            if (isCAAvailableForCert(self->tlsConfig, crt) == false)
+            {
+                raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_CA_CERT_NOT_AVAILABLE,
+                                   "Alarm: CA certificate not available for peer certificate", self);
+
+                *flags |= MBEDTLS_X509_BADCERT_NOT_TRUSTED;
+                return MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ;
             }
         }
 
@@ -1340,6 +1372,7 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
         self->handshakeInProgress = false;
         self->versionMismatchDetected = false;
         self->cacheAccessor = NULL;
+        self->currentTLSVersion = TLS_VERSION_NOT_SELECTED;
 
         TLSConfiguration_setupComplete(configuration);
 
@@ -1520,7 +1553,9 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
 
         self->lastRenegotiationTime = Hal_getMonotonicTimeInMs();
 
-        if (getTLSVersion(self->ssl.major_ver, self->ssl.minor_ver) < TLS_VERSION_TLS_1_2) {
+        self->currentTLSVersion = getTLSVersion(self->ssl.major_ver, self->ssl.minor_ver);
+
+        if (self->currentTLSVersion < TLS_VERSION_TLS_1_2) {
             raiseSecurityEvent(configuration, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_WRN_INSECURE_TLS_VERSION,  "Warning: Insecure TLS version", self);
         }
 
@@ -1737,6 +1772,22 @@ TLSSocket_read(TLSSocket self, uint8_t* buf, int size)
     while (len < size)
     {
         int ret = mbedtls_ssl_read(&(self->ssl), (buf + len), (size - len));
+
+        TLSConfigVersion tlsVersion = getTLSVersion(self->ssl.major_ver, self->ssl.minor_ver);
+
+        if (tlsVersion != self->currentTLSVersion)
+        {
+            DEBUG_PRINT("TLS", " TLS version changed during read: was %s, now %s\n",
+                TLSConfigVersion_toString(self->currentTLSVersion),
+                TLSConfigVersion_toString(tlsVersion));
+
+            self->currentTLSVersion = tlsVersion;
+
+            raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_TLS_VERSION_CHANGE, "Alarm: TLS version change detected", self);
+
+            /* connection should be closed when version change detected */
+            return -1;
+        }
 
         if (ret > 0) {
             len += ret;

@@ -6106,6 +6106,7 @@ test_CS104_MasterSlave_TLSConnectFails(void)
     TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_ALGO_NOT_SUPPORTED, eventInfo.eventCodes[0]);
 }
 
+#ifndef WITH_MBEDTLS3
 void
 test_CS104_MasterSlave_TLSVersionMismatch(void)
 {
@@ -6174,6 +6175,78 @@ test_CS104_MasterSlave_TLSVersionMismatch(void)
     TEST_ASSERT_EQUAL_INT(1, eventInfo.eventHandlerCalled);
     TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_UNSECURE_COMMUNICATION, eventInfo.eventCodes[0]);
 }
+#endif
+
+#ifdef WITH_MBEDTLS3
+void
+test_CS104_MasterSlave_TLSVersionMismatch_mbedtls3(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setMinTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_3);
+
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    TLSConfiguration_setAllowOnlyKnownCertificates(tlsConfig2, true);
+
+    TLSConfiguration_setMinTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_2);
+    TLSConfiguration_setMaxTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_2);
+
+    /* use valid certificate */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    res = TLSConfiguration_addAllowedCertificateFromFile(tlsConfig2, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    bool result = CS104_Connection_connect(con);
+
+    TEST_ASSERT_FALSE(result);
+
+    CS104_Slave_destroy(slave);
+
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    TEST_ASSERT_EQUAL_INT(1, eventInfo.eventHandlerCalled);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_UNSECURE_COMMUNICATION, eventInfo.eventCodes[0]);
+}
+#endif
 
 void
 test_CS104_MasterSlave_TLSCipherSuiteMismatch(void)
@@ -6196,6 +6269,8 @@ test_CS104_MasterSlave_TLSCipherSuiteMismatch(void)
     res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
     TEST_ASSERT_TRUE(res);
 
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+
     /* Restrict server to only TLS_RSA_WITH_AES_128_GCM_SHA256 */
     TLSConfiguration_clearCipherSuiteList(tlsConfig1);
     TLSConfiguration_addCipherSuite(tlsConfig1, TLS_RSA_WITH_AES_128_GCM_SHA256);
@@ -6203,6 +6278,8 @@ test_CS104_MasterSlave_TLSCipherSuiteMismatch(void)
     /* Client configuration - restrict to different cipher suite */
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
+
+     TLSConfiguration_setMaxTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_2);
     TLSConfiguration_setChainValidation(tlsConfig2, true);
     TLSConfiguration_setAllowOnlyKnownCertificates(tlsConfig2, true);
 
@@ -7191,6 +7268,76 @@ test_CS104_MasterSlave_TLSInvalidSignature(void)
     TEST_ASSERT_TRUE(foundCertNotTrustedEvent);
 }
 
+void
+test_CS104_MasterSlave_TLSUnknownCA(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with chain validation */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    // res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    // TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+
+    /* Client configuration with certificate that has invalid/corrupted signature */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Use certificate with corrupted signature */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should fail due to invalid signature */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_FALSE(result);
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security event for invalid signature was raised */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 1);
+
+    /* Find the certificate not trusted event (code 14) - this indicates signature validation failure */
+    bool foundCertNotTrustedEvent = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CA_CERT_NOT_AVAILABLE) {
+            foundCertNotTrustedEvent = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundCertNotTrustedEvent);
+}
+
 /**
  * Test that TLS session renegotiation works correctly and raises appropriate
  * security events. This test verifies the renegotiation mechanism is functional
@@ -7357,7 +7504,6 @@ test_CS104_MasterSlave_TLSRenegotiateAfterCRLUpdate(void)
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
     TLSConfiguration_setChainValidation(tlsConfig2, true);
-    ;
 
     /* use revoked certificate */
     res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
@@ -9422,8 +9568,15 @@ main(int argc, char** argv)
     RUN_TEST(test_CS104_MasterSlave_TLSConnectSuccess);
     RUN_TEST(test_CS104_MasterSlave_TLSConnectSuccessWithoutSeparateCACert);
     RUN_TEST(test_CS104_MasterSlave_TLSConnectFails);
+
+#ifndef WITH_MBEDTLS3
     RUN_TEST(test_CS104_MasterSlave_TLSVersionMismatch);
-    RUN_TEST(test_CS104_MasterSlave_TLSCipherSuiteMismatch);
+#endif
+
+#ifdef WITH_MBEDTLS3
+    RUN_TEST(test_CS104_MasterSlave_TLSVersionMismatch_mbedtls3);
+#endif
+   RUN_TEST(test_CS104_MasterSlave_TLSCipherSuiteMismatch);
     RUN_TEST(test_CS104_MasterSlave_TLSCipherSuiteMismatch_TLS_PSK_WITH_AES_256_GCM_SHA384);
     RUN_TEST(test_CS104_MasterSlave_TLSClientCertificateNotProvided);
     RUN_TEST(test_CS104_MasterSlave_TLSVersionChangeDetected);
@@ -9436,6 +9589,7 @@ main(int argc, char** argv)
     RUN_TEST(test_CS104_MasterSlave_TLSWarningMinimumKeyLength);
     RUN_TEST(test_CS104_MasterSlave_TLSWarningMinimumServerKeyLength);
     RUN_TEST(test_CS104_MasterSlave_TLSInvalidSignature);
+    RUN_TEST(test_CS104_MasterSlave_TLSUnknownCA);
     RUN_TEST(test_CS104_MasterSlave_TLSSuccessfulRenegotiation);
     RUN_TEST(test_CS104_MasterSlave_TLSRenegotiateAfterCRLUpdate);
     RUN_TEST(test_CS104_MasterSlave_TLSRenegotiationCRLExpired);
