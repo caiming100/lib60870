@@ -1230,6 +1230,12 @@ createSecurityEvents(TLSConfiguration config, int ret, uint32_t flags, TLSSocket
         raiseSecurityEvent(config, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_CERT_REQUIRED, "Alarm: Certificate required", socket);
         break;
 
+    case MBEDTLS_ERR_SSL_FEATURE_UNAVAILABLE:
+        /* this error is e.g. returned when the client sends a certificate that doesn't fit into a handshake TLS fragment and mbedtls doesn't support fragmented messages during handshake */
+        /* NOTE: This error could also be caused by other unsupported TLS features so the below security event might not always be accurate! */
+        raiseSecurityEvent(config, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_CERT_SIZE_EXCEEDED, "Alarm: TLS certificate size exceeded", socket);
+        break;
+
     case MBEDTLS_ERR_X509_CERT_VERIFY_FAILED:
         /* Certificate verification details already handled above based on flags */
         break;
@@ -1809,6 +1815,13 @@ TLSSocket_read(TLSSocket self, uint8_t* buf, int size)
 
         case MBEDTLS_ERR_NET_CONN_RESET:
             DEBUG_PRINT("TLS", " connection was reset by peer\n");
+            return -1;
+
+        case MBEDTLS_ERR_SSL_FEATURE_UNAVAILABLE:
+            DEBUG_PRINT("TLS", " mbedtls_ssl_read returned MBEDTLS_ERR_SSL_FEATURE_UNAVAILABLE\n");
+            /* this error is e.g. returned when the client sends a certificate that doesn't fit into a handshake TLS fragment and mbedtls doesn't support fragmented messages during handshake */
+            /* NOTE: This error could also be caused by other unsupported TLS features so the below security event might not always be accurate! */
+            raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_CERT_SIZE_EXCEEDED, "Alarm: TLS certificate size exceeded", self);
             return -1;
 
         default:
