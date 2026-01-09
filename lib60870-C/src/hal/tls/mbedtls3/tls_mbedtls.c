@@ -1143,6 +1143,12 @@ TLSConfiguration_setRenegotiationTime(TLSConfiguration self, int timeInMs)
 }
 
 void
+TLSConfiguration_setRenegotiationTimeout(TLSConfiguration self, int timeoutInMs)
+{
+    /* not supported */
+}
+
+void
 TLSConfiguration_destroy(TLSConfiguration self)
 {
     if (self)

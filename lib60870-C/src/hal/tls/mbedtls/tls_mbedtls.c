@@ -22,6 +22,7 @@
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/x509.h"
 #include "mbedtls/ssl.h"
+#include "mbedtls/ssl_internal.h"
 #include "mbedtls/net_sockets.h"
 #include "mbedtls/error.h"
 #include "mbedtls/debug.h"
@@ -35,13 +36,46 @@
 #define SEC_EVENT_INFO 0
 
 #ifndef CONFIG_DEBUG_TLS
-#define CONFIG_DEBUG_TLS 0
+#define CONFIG_DEBUG_TLS 1
 #endif
 
 #if (CONFIG_DEBUG_TLS == 1)
-#define DEBUG_PRINT(appId, fmt, ...) fprintf(stderr, "%s: " fmt, appId, ## __VA_ARGS__)
+static void
+tlsFormatTimestamp(char* buffer, size_t bufferSize)
+{
+    if (buffer == NULL || bufferSize == 0)
+        return;
+
+    msSinceEpoch timestampMs = Hal_getTimeInMs();
+    time_t seconds = (time_t)(timestampMs / 1000);
+    int millis = (int)(timestampMs % 1000);
+
+    struct tm timeInfo;
+
+#if defined(_WIN32)
+    localtime_s(&timeInfo, &seconds);
 #else
-#define DEBUG_PRINT(fmt, ...) do {} while(0)
+    localtime_r(&seconds, &timeInfo);
+#endif
+
+    snprintf(buffer, bufferSize,
+        "%04d-%02d-%02d %02d:%02d:%02d.%03d",
+        timeInfo.tm_year + 1900,
+        timeInfo.tm_mon + 1,
+        timeInfo.tm_mday,
+        timeInfo.tm_hour,
+        timeInfo.tm_min,
+        timeInfo.tm_sec,
+        millis);
+}
+
+#define DEBUG_PRINT(appId, fmt, ...) do { \
+        char _timestamp[32]; \
+        tlsFormatTimestamp(_timestamp, sizeof(_timestamp)); \
+        fprintf(stderr, "[%s] %s: " fmt, _timestamp, appId, ## __VA_ARGS__); \
+    } while(0)
+#else
+#define DEBUG_PRINT(appId, fmt, ...) do {} while(0)
 #endif
 
 typedef struct TLSCacheEntry
@@ -105,6 +139,9 @@ struct sTLSConfiguration
     /* minimum public key length in bits */
     int minKeyLengthInBits;
 
+    /* maximum time a renegotiation is allowed to take */
+    int renegotiationTimeoutInMs;
+
     TLSConfiguration_EventHandler eventHandler;
     void* eventHandlerParameter;
 
@@ -132,6 +169,7 @@ struct sTLSSocket
 
     /* time of last session renegotiation (used to calculate next renegotiation time) */
     uint64_t lastRenegotiationTime;
+    bool renegotiationInProgress;
 
     /* time of the last CRL update */
     uint64_t crlUpdated;
@@ -147,6 +185,8 @@ struct sTLSSocket
     bool handshakeInProgress;
 
     TLSConfigVersion currentTLSVersion;
+
+    uint64_t renegotiationStartTime;
 };
 
 struct TLSCacheAccessor
@@ -827,6 +867,7 @@ TLSConfiguration_create()
         self->minVersion = TLS_VERSION_TLS_1_2;
         self->maxVersion = TLS_VERSION_NOT_SELECTED;
         self->minKeyLengthInBits = 1024;
+        self->renegotiationTimeoutInMs = 10000; /* default: 10 seconds */
 
         self->renegotiationTimeInMs = -1; /* no automatic renegotiation */
 
@@ -1120,6 +1161,15 @@ TLSConfiguration_setRenegotiationTime(TLSConfiguration self, int timeInMs)
 }
 
 void
+TLSConfiguration_setRenegotiationTimeout(TLSConfiguration self, int timeoutInMs)
+{
+    if (timeoutInMs <= 0)
+        self->renegotiationTimeoutInMs = 0;
+    else
+        self->renegotiationTimeoutInMs = timeoutInMs;
+}
+
+void
 TLSConfiguration_destroy(TLSConfiguration self)
 {
     if (self)
@@ -1379,6 +1429,7 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
         self->versionMismatchDetected = false;
         self->cacheAccessor = NULL;
         self->currentTLSVersion = TLS_VERSION_NOT_SELECTED;
+        self->renegotiationStartTime = 0;
 
         TLSConfiguration_setupComplete(configuration);
 
@@ -1558,6 +1609,7 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
         }
 
         self->lastRenegotiationTime = Hal_getMonotonicTimeInMs();
+        self->renegotiationInProgress = false;
 
         self->currentTLSVersion = getTLSVersion(self->ssl.major_ver, self->ssl.minor_ver);
 
@@ -1590,55 +1642,133 @@ TLSSocket_getPeerCertificate(TLSSocket self, int* certSize)
 }
 
 static bool
-performHandshakeAsServer(TLSSocket self)
+renegotiationTimedOut(TLSSocket self)
 {
-    int ret = mbedtls_ssl_renegotiate(&(self->ssl));
+    if (self->tlsConfig->renegotiationTimeoutInMs <= 0)
+        return false;
 
-    if (ret == 0 || ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE ||
-        ret == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS || ret == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS)
+    if (self->renegotiationStartTime == 0)
+        return false;
+
+    uint64_t now = Hal_getMonotonicTimeInMs();
+    uint64_t elapsed = now - self->renegotiationStartTime;
+
+    return elapsed >= (uint64_t) self->tlsConfig->renegotiationTimeoutInMs;
+}
+
+static bool
+abortRenegotiationDueToTimeout(TLSSocket self)
+{
+    DEBUG_PRINT("TLS", "TLS renegotiation timed out after %d ms\n",
+        self->tlsConfig->renegotiationTimeoutInMs);
+
+    raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_INCIDENT,
+        TLS_EVENT_CODE_ALM_RENEGOTIATION_TIMEOUT,
+        "Alarm: session renegotiation interval expired", self);
+
+    self->renegotiationInProgress = false;
+    self->renegotiationStartTime = 0;
+    self->handshakeInProgress = false;
+
+    int resetRet = mbedtls_ssl_session_reset(&(self->ssl));
+    if (resetRet != 0)
     {
-        if (ret == 0)
-        {
-            /* Renegotiation handshake completed successfully - now check certificate verification */
-            uint32_t flags = mbedtls_ssl_get_verify_result(&(self->ssl));
-
-            if (flags != 0)
-            {
-                /* Certificate validation failed - raise specific events for security logging */
-                DEBUG_PRINT("TLS", "Certificate verification failed after renegotiation (flags: 0x%x)\n", flags);
-
-                createSecurityEvents(self->tlsConfig, MBEDTLS_ERR_X509_CERT_VERIFY_FAILED, flags, self);
-
-                self->certValidationFailed = true;
-
-                raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, "Alarm: TLS session renegotiation failed", self);
-
-                /* Do NOT reset session - connection should terminate cleanly to prevent multiple handshake attempts */
-                return false;
-            }
-
-            if (getTLSVersion(self->ssl.major_ver, self->ssl.minor_ver) < TLS_VERSION_TLS_1_2) {
-                raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_WRN_INSECURE_TLS_VERSION, "Warning: Insecure TLS version", self);
-            }
-        }
-
-        DEBUG_PRINT("TLS", "TLSSocket_performHandshake Success -> ret=%i\n", ret);
-        return true;
+        DEBUG_PRINT("TLS", "mbedtls_ssl_session_reset failed -> ret: -0x%X\n", -resetRet);
     }
-    else
+
+    return false;
+}
+
+static bool
+tlsHandshakeCompleted(TLSSocket self)
+{
+#if defined(MBEDTLS_SSL_RENEGOTIATION)
+    if (self->ssl.renego_status == MBEDTLS_SSL_RENEGOTIATION_PENDING ||
+        self->ssl.renego_status == MBEDTLS_SSL_RENEGOTIATION_IN_PROGRESS)
     {
-        DEBUG_PRINT("TLS", "TLSSocket_performHandshake failed -> ret=%i\n", ret);
+        return false;
+    }
+
+    return true;
+#else
+    return (self->ssl.state == MBEDTLS_SSL_HANDSHAKE_OVER);
+#endif
+}
+
+static bool
+completeServerRenegotiation(TLSSocket self)
+{
+    /* Renegotiation handshake completed successfully - now check certificate verification */
+    uint32_t flags = mbedtls_ssl_get_verify_result(&(self->ssl));
+
+    if (flags != 0)
+    {
+        /* Certificate validation failed - raise specific events for security logging */
+        DEBUG_PRINT("TLS", "Certificate verification failed after renegotiation (flags: 0x%x)\n", flags);
+
+        createSecurityEvents(self->tlsConfig, MBEDTLS_ERR_X509_CERT_VERIFY_FAILED, flags, self);
+
+        self->certValidationFailed = true;
 
         raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, "Alarm: TLS session renegotiation failed", self);
 
-        /* mbedtls_ssl_renegotiate mandates to reset the ssl session in case of errors */
-        ret = mbedtls_ssl_session_reset(&(self->ssl));
-        if (ret != 0) {
-            DEBUG_PRINT("TLS", "mbedtls_ssl_session_reset failed -> ret: -0x%X\n", -ret);
-        }
-
+        /* Do NOT reset session - connection should terminate cleanly to prevent multiple handshake attempts */
+        self->handshakeInProgress = false;
         return false;
     }
+
+    if (getTLSVersion(self->ssl.major_ver, self->ssl.minor_ver) < TLS_VERSION_TLS_1_2) {
+        raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_WRN_INSECURE_TLS_VERSION, "Warning: Insecure TLS version", self);
+    }
+
+    DEBUG_PRINT("TLS", "TLSSocket_performHandshake Success\n");
+    self->handshakeInProgress = false;
+    return true;
+}
+
+static bool
+performHandshakeAsServer(TLSSocket self)
+{
+    if (self->handshakeInProgress)
+    {
+        if (tlsHandshakeCompleted(self))
+        {
+            return completeServerRenegotiation(self);
+        }
+
+        /* Handshake progresses implicitly via mbedtls read/write calls */
+        return true;
+    }
+
+    /* Start a new renegotiation - this sends HelloRequest to the peer */
+    self->handshakeInProgress = true;
+    int ret = mbedtls_ssl_renegotiate(&(self->ssl));
+
+    if (ret == 0)
+    {
+        return completeServerRenegotiation(self);
+    }
+
+    if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE ||
+        ret == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS || ret == MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS)
+    {
+        /* Renegotiation handshake will continue during future read/write calls */
+        return true;
+    }
+
+    DEBUG_PRINT("TLS", "TLSSocket_performHandshake failed -> ret=%i\n", ret);
+
+    raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, "Alarm: TLS session renegotiation failed", self);
+
+    /* mbedtls_ssl_renegotiate mandates to reset the ssl session in case of errors */
+    int reset = mbedtls_ssl_session_reset(&(self->ssl));
+    if (reset != 0) {
+        DEBUG_PRINT("TLS", "mbedtls_ssl_session_reset failed -> ret: -0x%X\n", -reset);
+    }
+
+    self->handshakeInProgress = false;
+
+    return false;
 }
 
 static bool
@@ -1683,7 +1813,19 @@ performHandshakeAsClient(TLSSocket self)
             return true;
         }
 
+        if (renegotiationTimedOut(self))
+        {
+            self->handshakeInProgress = false;
+            return abortRenegotiationDueToTimeout(self);
+        }
+
         ret = mbedtls_ssl_renegotiate(&(self->ssl));
+    }
+
+    if (renegotiationTimedOut(self))
+    {
+        self->handshakeInProgress = false;
+        return abortRenegotiationDueToTimeout(self);
     }
 
     DEBUG_PRINT("TLS", "TLSSocket_performHandshake failed -> ret=%i\n", ret);
@@ -1736,10 +1878,62 @@ checkForCRLUpdate(TLSSocket self)
 static bool
 startRenegotiationIfRequired(TLSSocket self)
 {
+    if (self->renegotiationInProgress)
+    {
+        if (renegotiationTimedOut(self))
+            return abortRenegotiationDueToTimeout(self);
+
+        if (self->conf.endpoint == MBEDTLS_SSL_IS_SERVER)
+        {
+            if (tlsHandshakeCompleted(self))
+            {
+                if (completeServerRenegotiation(self) == false)
+                {
+                    DEBUG_PRINT("TLS", " renegotiation failed (server completion)\n");
+                    self->renegotiationInProgress = false;
+                    self->renegotiationStartTime = 0;
+                    return false;
+                }
+
+                DEBUG_PRINT("TLS", " renegotiation completed (server)\n");
+                self->renegotiationInProgress = false;
+                self->renegotiationStartTime = 0;
+                self->lastRenegotiationTime = Hal_getMonotonicTimeInMs();
+            }
+
+            /* Server-side renegotiation progresses implicitly via read/write */
+            return true;
+        }
+
+        bool handshakeOk = TLSSocket_performHandshake(self);
+
+        if (handshakeOk == false)
+        {
+            DEBUG_PRINT("TLS", " renegotiation failed during progress\n");
+            self->renegotiationInProgress = false;
+            self->renegotiationStartTime = 0;
+            self->handshakeInProgress = false;
+            return false;
+        }
+
+        if (tlsHandshakeCompleted(self))
+        {
+            DEBUG_PRINT("TLS", " renegotiation completed\n");
+            self->renegotiationInProgress = false;
+            self->renegotiationStartTime = 0;
+            self->lastRenegotiationTime = Hal_getMonotonicTimeInMs();
+            self->handshakeInProgress = false;
+        }
+
+        return true;
+    }
+
     if (self->tlsConfig->renegotiationTimeInMs <= 0)
         return true;
 
-    if (Hal_getMonotonicTimeInMs() <= self->lastRenegotiationTime + self->tlsConfig->renegotiationTimeInMs)
+    uint64_t now = Hal_getMonotonicTimeInMs();
+
+    if (now <= self->lastRenegotiationTime + self->tlsConfig->renegotiationTimeInMs)
         return true;
 
     raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_INFO, TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, "Info: session renegotiation started", self);
@@ -1748,14 +1942,32 @@ startRenegotiationIfRequired(TLSSocket self)
     self->certValidationFailed = false;
     self->lastCertVerifyFlags = 0;
 
-    if (TLSSocket_performHandshake(self) == false)
+    self->renegotiationInProgress = true;
+    self->renegotiationStartTime = now;
+
+    bool handshakeOk = TLSSocket_performHandshake(self);
+
+    if (handshakeOk == false)
     {
         DEBUG_PRINT("TLS", " renegotiation failed\n");
+        self->renegotiationStartTime = 0;
+        self->renegotiationInProgress = false;
+        self->handshakeInProgress = false;
         return false;
     }
 
-    DEBUG_PRINT("TLS", " started renegotiation\n");
-    self->lastRenegotiationTime = Hal_getMonotonicTimeInMs();
+    if (self->conf.endpoint == MBEDTLS_SSL_IS_CLIENT || tlsHandshakeCompleted(self))
+    {
+        self->renegotiationInProgress = false;
+        self->renegotiationStartTime = 0;
+        self->lastRenegotiationTime = Hal_getMonotonicTimeInMs();
+        DEBUG_PRINT("TLS", " renegotiation completed\n");
+        self->handshakeInProgress = false;
+    }
+    else
+    {
+        DEBUG_PRINT("TLS", " renegotiation in progress (server wait)\n");
+    }
 
     return true;
 }
@@ -1763,12 +1975,16 @@ startRenegotiationIfRequired(TLSSocket self)
 int
 TLSSocket_read(TLSSocket self, uint8_t* buf, int size)
 {
-    if (self->handshakeInProgress) {
-        /* Avoid reading data while handshake is in progress */
-        return 0;
-    }
-
     checkForCRLUpdate(self);
+
+    if (self->renegotiationInProgress)
+    {
+        if (renegotiationTimedOut(self)) {
+            abortRenegotiationDueToTimeout(self);
+
+            return -1;
+        }
+    }
 
     if (startRenegotiationIfRequired(self) == false) {
         return -1;
@@ -1877,12 +2093,16 @@ TLSSocket_write(TLSSocket self, uint8_t* buf, int size)
 {
     int len = 0;
 
-    if (self->handshakeInProgress) {
-        /* Avoid writing data while handshake is in progress */
-        return 0;
-    }
-
     checkForCRLUpdate(self);
+
+    if (self->renegotiationInProgress)
+    {
+        if (renegotiationTimedOut(self)) {
+            abortRenegotiationDueToTimeout(self);
+
+            return -1;
+        }
+    }
 
     if (startRenegotiationIfRequired(self) == false)
     {

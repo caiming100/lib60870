@@ -101,6 +101,7 @@ typedef enum {
 #define TLS_EVENT_CODE_ALM_INSUFFICIENT_KEY_LENGTH 23
 #define TLS_EVENT_CODE_WRN_CRL_NOT_ACCESSIBLE 24
 #define TLS_EVENT_CODE_ALM_CA_CERT_NOT_AVAILABLE 25
+#define TLS_EVENT_CODE_ALM_RENEGOTIATION_TIMEOUT 26
 
 typedef struct sTLSConnection* TLSConnection;
 
@@ -284,6 +285,19 @@ TLSConfiguration_addCACertificateFromFile(TLSConfiguration self, const char* fil
  */
 PAL_API void
 TLSConfiguration_setRenegotiationTime(TLSConfiguration self, int timeInMs);
+
+/**
+ * \brief Set the maximum time allowed for TLS session renegotiation.
+ *
+ * When the renegotiation handshake does not complete within the configured
+ * timeout a security event is generated and the renegotiation attempt is
+ * aborted. Provide a value \<= 0 to disable the timeout enforcement.
+ * The default is 10000 milliseconds.
+ *
+ * \param timeoutInMs timeout in milliseconds
+ */
+PAL_API void
+TLSConfiguration_setRenegotiationTimeout(TLSConfiguration self, int timeoutInMs);
 
 /**
  * \brief Set minimal allowed TLS version to use
