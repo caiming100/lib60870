@@ -843,8 +843,10 @@ _CS104_Connection_establishSocket(CS104_Connection self)
 bool
 CS104_Connection_startThreadless(CS104_Connection self)
 {
+#if (CONFIG_USE_THREADS == 1)
     if (self->connectionHandlingThread) /* safety: don't allow both modes */
         return false;
+#endif
 
     if (_CS104_Connection_establishSocket(self) == false)
     {
