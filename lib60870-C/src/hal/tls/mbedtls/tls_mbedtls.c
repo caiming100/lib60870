@@ -96,6 +96,7 @@ typedef struct TLSVersionedCache
     int max_entries;
     Semaphore mutex;
     bool initialized;
+    TLSConfiguration owner;
 } TLSVersionedCache;
 
 struct TLSCacheAccessor;
@@ -187,6 +188,7 @@ struct sTLSSocket
     TLSConfigVersion currentTLSVersion;
 
     uint64_t renegotiationStartTime;
+    bool sessionResumptionPending;
 };
 
 struct TLSCacheAccessor
@@ -203,6 +205,21 @@ raiseSecurityEvent(TLSConfiguration config, TLSEventLevel eventCategory, int eve
         config->eventHandler(config->eventHandlerParameter, eventCategory, eventCode, message, (TLSConnection)socket);
 }
 
+static void
+logAbbreviatedHandshakeIfNeeded(TLSSocket socket)
+{
+    if (socket == NULL)
+        return;
+
+    if (socket->sessionResumptionPending)
+    {
+        raiseSecurityEvent(socket->tlsConfig, TLS_SEC_EVT_INFO,
+            TLS_EVENT_CODE_INF_SESSION_RESUMED,
+            "Info: Abbreviated TLS handshake completed using cached session", socket);
+        socket->sessionResumptionPending = false;
+    }
+}
+
 static TLSConfigVersion getTLSVersion(int majorVersion, int minorVersion);
 
 static void
@@ -216,6 +233,7 @@ tlsVersionedCacheInit(TLSVersionedCache *cache)
     cache->max_entries = MBEDTLS_SSL_CACHE_DEFAULT_MAX_ENTRIES;
 
     cache->mutex = Semaphore_create(1);
+    cache->owner = NULL;
 
     cache->initialized = true;
 }
@@ -247,7 +265,7 @@ tlsVersionedCacheFree(TLSVersionedCache *cache)
 }
 
 static int
-tlsVersionedCacheGet(TLSVersionedCache *cache, mbedtls_ssl_session *session, TLSConfigVersion *versionOut)
+tlsVersionedCacheGet(TLSVersionedCache *cache, mbedtls_ssl_session *session, TLSConfigVersion *versionOut, TLSSocket socket)
 {
     if (cache == NULL || cache->initialized == false)
         return 1;
@@ -262,15 +280,20 @@ tlsVersionedCacheGet(TLSVersionedCache *cache, mbedtls_ssl_session *session, TLS
 
     while (cur != NULL)
     {
-        if (cache->timeout != 0 && (uint64_t)(t - cur->timestamp) > cache->timeout)
-        {
-            cur = cur->next;
-            continue;
-        }
-
         if (session->id_len == cur->sessionIdLength &&
             memcmp(session->id, cur->sessionId, cur->sessionIdLength) == 0)
         {
+            if (cache->timeout != 0 && (uint64_t)(t - cur->timestamp) > cache->timeout)
+            {
+                /* cached session timed out */
+                raiseSecurityEvent(cache->owner, TLS_SEC_EVT_INFO,
+                    TLS_EVENT_CODE_INF_SESSION_EXPIRED,
+                    "Info: Session could not be resumed sessionID lifetime expired. Performing a full TLS handshake instead", socket);
+
+                ret = 1;
+                goto exit;
+            }
+
             if (cur->serializedSession == NULL || cur->serializedSessionLength == 0)
             {
                 ret = 1;
@@ -290,6 +313,10 @@ tlsVersionedCacheGet(TLSVersionedCache *cache, mbedtls_ssl_session *session, TLS
 
             if (versionOut)
                 *versionOut = cur->version;
+
+            raiseSecurityEvent(cache->owner, TLS_SEC_EVT_INFO,
+                TLS_EVENT_CODE_INF_SESSION_RESUMED,
+                "Info: Abbreviated TLS handshake completed using cached session", socket);
 
             ret = 0;
             goto exit;
@@ -482,13 +509,17 @@ tls_cache_get_callback(void *data, mbedtls_ssl_session *session)
     if (accessor == NULL || accessor->cache == NULL)
         return 1;
 
+    TLSSocket socket = accessor->socket;
+
+    if (socket)
+        socket->sessionResumptionPending = false;
+
     TLSConfigVersion cachedVersion = TLS_VERSION_NOT_SELECTED;
-    int ret = tlsVersionedCacheGet(accessor->cache, session, &cachedVersion);
+    int ret = tlsVersionedCacheGet(accessor->cache, session, &cachedVersion, socket);
 
     if (ret != 0)
         return ret;
 
-    TLSSocket socket = accessor->socket;
     TLSConfigVersion requestedVersion = TLS_VERSION_NOT_SELECTED;
 
     if (socket)
@@ -508,6 +539,9 @@ tls_cache_get_callback(void *data, mbedtls_ssl_session *session)
 
         return 1;
     }
+
+    if (socket)
+        socket->sessionResumptionPending = true;
 
     return 0;
 }
@@ -771,6 +805,7 @@ TLSConfiguration_setupComplete(TLSConfiguration self)
             if (self->conf.endpoint == MBEDTLS_SSL_IS_SERVER)
             {
                 tlsVersionedCacheInit(&(self->serverSessionCache));
+                self->serverSessionCache.owner = self;
                 self->serverSessionCache.timeout = self->sessionResumptionInterval;
             }
         }
@@ -862,7 +897,7 @@ TLSConfiguration_create()
         mbedtls_ssl_conf_renegotiation(&(self->conf), MBEDTLS_SSL_RENEGOTIATION_ENABLED);
 
         /* Allow legacy renegotiation to support client-initiated renegotiation */
-        mbedtls_ssl_conf_legacy_renegotiation(&(self->conf), MBEDTLS_SSL_LEGACY_ALLOW_RENEGOTIATION);
+        mbedtls_ssl_conf_legacy_renegotiation(&(self->conf), MBEDTLS_SSL_LEGACY_NO_RENEGOTIATION);
 
         self->minVersion = TLS_VERSION_TLS_1_2;
         self->maxVersion = TLS_VERSION_NOT_SELECTED;
@@ -1477,6 +1512,7 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
             if (configuration->serverSessionCache.initialized == false)
             {
                 tlsVersionedCacheInit(&(configuration->serverSessionCache));
+                configuration->serverSessionCache.owner = configuration;
                 configuration->serverSessionCache.timeout = configuration->sessionResumptionInterval;
             }
 
@@ -1539,6 +1575,9 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
             }
         }
 
+        /* disable host name verification */
+        mbedtls_ssl_set_hostname(&(self->ssl), NULL);
+
         while ((ret = mbedtls_ssl_handshake(&(self->ssl))) != 0)
         {
             if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE)
@@ -1552,6 +1591,7 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
                     createSecurityEvents(configuration, ret, flags, self);
                 }
 
+                self->sessionResumptionPending = false;
                 mbedtls_ssl_free(&(self->ssl));
 
                 if (self->peerCert)
@@ -1569,6 +1609,7 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
         if (self->versionMismatchDetected)
         {
             DEBUG_PRINT("TLS", "Handshake flagged TLS version mismatch after completion\n");
+            self->sessionResumptionPending = false;
             mbedtls_ssl_free(&(self->ssl));
             if (self->peerCert)
                 GLOBAL_FREEMEM(self->peerCert);
@@ -1577,6 +1618,8 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
             GLOBAL_FREEMEM(self);
             return NULL;
         }
+
+        logAbbreviatedHandshakeIfNeeded(self);
 
         if (configuration->useSessionResumption)
         {
@@ -1669,6 +1712,7 @@ abortRenegotiationDueToTimeout(TLSSocket self)
     self->renegotiationInProgress = false;
     self->renegotiationStartTime = 0;
     self->handshakeInProgress = false;
+    self->sessionResumptionPending = false;
 
     int resetRet = mbedtls_ssl_session_reset(&(self->ssl));
     if (resetRet != 0)
@@ -1709,6 +1753,7 @@ completeServerRenegotiation(TLSSocket self)
         createSecurityEvents(self->tlsConfig, MBEDTLS_ERR_X509_CERT_VERIFY_FAILED, flags, self);
 
         self->certValidationFailed = true;
+        self->sessionResumptionPending = false;
 
         raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, "Alarm: TLS session renegotiation failed", self);
 
@@ -1721,6 +1766,7 @@ completeServerRenegotiation(TLSSocket self)
         raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_WRN_INSECURE_TLS_VERSION, "Warning: Insecure TLS version", self);
     }
 
+    logAbbreviatedHandshakeIfNeeded(self);
     DEBUG_PRINT("TLS", "TLSSocket_performHandshake Success\n");
     self->handshakeInProgress = false;
     return true;
@@ -1761,6 +1807,7 @@ performHandshakeAsServer(TLSSocket self)
     raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, "Alarm: TLS session renegotiation failed", self);
 
     /* mbedtls_ssl_renegotiate mandates to reset the ssl session in case of errors */
+    self->sessionResumptionPending = false;
     int reset = mbedtls_ssl_session_reset(&(self->ssl));
     if (reset != 0) {
         DEBUG_PRINT("TLS", "mbedtls_ssl_session_reset failed -> ret: -0x%X\n", -reset);
@@ -1794,6 +1841,7 @@ performHandshakeAsClient(TLSSocket self)
                 createSecurityEvents(self->tlsConfig, MBEDTLS_ERR_X509_CERT_VERIFY_FAILED, flags, self);
 
                 self->certValidationFailed = true;
+                self->sessionResumptionPending = false;
 
                 raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, "Alarm: TLS session renegotiation failed", self);
 
@@ -1833,6 +1881,7 @@ performHandshakeAsClient(TLSSocket self)
     raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, "Alarm: TLS session renegotiation failed", self);
 
     /* mbedtls_ssl_renegotiate mandates to reset the ssl session in case of errors */
+    self->sessionResumptionPending = false;
     ret = mbedtls_ssl_session_reset(&(self->ssl));
     if (ret != 0) {
         DEBUG_PRINT("TLS", "mbedtls_ssl_session_reset failed -> ret: -0x%X\n", -ret);
