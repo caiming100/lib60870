@@ -904,41 +904,6 @@ HighPriorityASDUQueue_resetConnectionQueue(HighPriorityASDUQueue self)
 #endif
 }
 
-static bool
-HighPriorityASDUQueue_hasUnconfirmedIMessages(HighPriorityASDUQueue self)
-{
-    bool retVal = false;
-
-    if (self->entryCounter != 0)
-    {
-        uint8_t* entryPtr = self->firstEntry;
-
-        struct sMessageQueueEntryInfo entryInfo;
-
-        while (entryPtr)
-        {
-            memcpy(&entryInfo, entryPtr, sizeof(struct sMessageQueueEntryInfo));
-
-            if (entryInfo.entryState == QUEUE_ENTRY_STATE_SENT_BUT_NOT_CONFIRMED)
-            {
-                retVal = true;
-                break;
-            }
-
-            if (entryPtr == self->lastEntry)
-                break;
-
-            /* move to next entry */
-            if (entryPtr == self->lastInBufferEntry)
-                entryPtr = self->buffer;
-            else
-                entryPtr = entryPtr + sizeof(struct sMessageQueueEntryInfo) + entryInfo.size;
-        }
-    }
-
-    return retVal;
-}
-
 /***************************************************
  * RedundancyGroup
  ***************************************************/
@@ -3107,14 +3072,14 @@ handleMessage(MasterConnection self, uint8_t* buffer, int msgSize)
 
             MasterConnection_deactivate(self);
 
-            /* Send S-Message to confirm all outstanding messages */
-
 #if (CONFIG_USE_SEMAPHORES == 1)
             Semaphore_wait(self->stateLock);
 #endif
 
             if (self->unconfirmedReceivedIMessages > 0)
             {
+                /* Send S-Message to confirm all outstanding messages */
+
                 self->lastConfirmationTime = Hal_getMonotonicTimeInMs();
 
                 self->unconfirmedReceivedIMessages = 0;
@@ -3180,6 +3145,8 @@ handleMessage(MasterConnection self, uint8_t* buffer, int msgSize)
                 DEBUG_PRINT("CS104 SLAVE: S message - sequence number mismatch");
                 return false;
             }
+
+            printSendBuffer(self);
 
             if (self->state == M_CON_STATE_UNCONFIRMED_STOPPED)
             {
@@ -4118,10 +4085,10 @@ MasterConnection_hasUnconfirmedMessages(MasterConnection self)
     {
         if (MessageQueue_hasUnconfirmedIMessages(self->lowPrioQueue))
             return true;
-
-        if (HighPriorityASDUQueue_hasUnconfirmedIMessages(self->highPrioQueue))
-            return true;
     }
+
+    if (self->oldestSentASDU != -1)
+        retVal = true;
 
     return retVal;
 }
