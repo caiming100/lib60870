@@ -959,7 +959,8 @@ CS104_Connection_run(CS104_Connection self, int timeoutMs)
 #if (CONFIG_USE_SEMAPHORES == 1)
     Semaphore_wait(self->conStateLock);
 #endif
-    if ((self->unconfirmedReceivedIMessages >= self->parameters.w) || (self->conState == STATE_WAITING_FOR_STOPDT_CON))
+    if ((self->unconfirmedReceivedIMessages >= self->parameters.w) ||
+        ((self->conState == STATE_WAITING_FOR_STOPDT_CON) && (self->unconfirmedReceivedIMessages > 0)))
     {
         confirmOutstandingMessages(self);
     }
@@ -1580,7 +1581,7 @@ handleConnection(void* parameter)
 #endif /* (CONFIG_USE_SEMAPHORES == 1) */
 
                         if ((self->unconfirmedReceivedIMessages >= self->parameters.w) ||
-                            (self->conState == STATE_WAITING_FOR_STOPDT_CON))
+                            ((self->conState == STATE_WAITING_FOR_STOPDT_CON) && (self->unconfirmedReceivedIMessages > 0)))
                         {
                             confirmOutstandingMessages(self);
                         }
@@ -1799,7 +1800,8 @@ CS104_Connection_sendStopDT(CS104_Connection self)
 
     if (self->socket)
     {
-        confirmOutstandingMessages(self);
+        if (self->unconfirmedReceivedIMessages > 0)
+            confirmOutstandingMessages(self);
 
         self->conState = STATE_WAITING_FOR_STOPDT_CON;
         self->uMessageTimeout = Hal_getMonotonicTimeInMs() + (self->parameters.t1 * 1000);
