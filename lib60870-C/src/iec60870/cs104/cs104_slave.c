@@ -2082,9 +2082,9 @@ sendASDU(MasterConnection self, uint8_t* buffer, int msgSize, uint64_t entryId, 
 }
 
 static bool
-sendASDUInternal(MasterConnection self, CS101_ASDU asdu)
+sendASDUInternal(MasterConnection self, CS101_ASDU asdu, bool dontQueueIfBufferFull)
 {
-    bool asduSent;
+    bool asduSent = false;
 
     if (MasterConnection_isActive(self))
     {
@@ -2111,7 +2111,7 @@ sendASDUInternal(MasterConnection self, CS101_ASDU asdu)
 
             asduSent = true;
         }
-        else
+        else if (dontQueueIfBufferFull == false)
         {
 #if (CONFIG_USE_SEMAPHORES == 1)
             Semaphore_post(self->sentASDUsLock);
@@ -2119,11 +2119,9 @@ sendASDUInternal(MasterConnection self, CS101_ASDU asdu)
             asduSent = HighPriorityASDUQueue_enqueue(self->highPrioQueue, asdu);
         }
     }
-    else
-        asduSent = false;
 
     if (asduSent == false)
-        DEBUG_PRINT("CS104 SLAVE: unable to send response (state=%i)\n", self->state);
+        DEBUG_PRINT("CS104 SLAVE: unable to send ASDU (state=%i)\n", self->state);
 
     return asduSent;
 }
@@ -2133,7 +2131,7 @@ responseNegative(CS101_ASDU asdu, MasterConnection self, CS101_CauseOfTransmissi
 {
     CS101_ASDU_setCOT(asdu, cot);
     CS101_ASDU_setNegative(asdu, true);
-    sendASDUInternal(self, asdu);
+    sendASDUInternal(self, asdu, false);
 }
 
 static void
@@ -2417,14 +2415,14 @@ handleASDU(MasterConnection self, CS101_ASDU asdu, CS101_SlavePlugin callingPlug
 
                             CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
 
-                            sendASDUInternal(self, asdu);
+                            sendASDUInternal(self, asdu, false);
                         }
                         else
                         {
                             CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
                             CS101_ASDU_setNegative(asdu, true);
 
-                            sendASDUInternal(self, asdu);
+                            sendASDUInternal(self, asdu, false);
                         }
                     }
 
@@ -2630,7 +2628,7 @@ handleASDU(MasterConnection self, CS101_ASDU asdu, CS101_SlavePlugin callingPlug
                 }
 
                 CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
-                sendASDUInternal(self, asdu);
+                sendASDUInternal(self, asdu, false);
 
                 return true;
             }
@@ -2656,7 +2654,7 @@ handleASDU(MasterConnection self, CS101_ASDU asdu, CS101_SlavePlugin callingPlug
         /* send error response */
         CS101_ASDU_setCOT(asdu, CS101_COT_UNKNOWN_TYPE_ID);
         CS101_ASDU_setNegative(asdu, true);
-        sendASDUInternal(self, asdu);
+        sendASDUInternal(self, asdu, false);
     }
 
     return true;
@@ -3807,8 +3805,23 @@ _IMasterConnection_sendASDU(IMasterConnection self, CS101_ASDU asdu)
     MasterConnection con = (MasterConnection)self->object;
 
     return HighPriorityASDUQueue_enqueue(con->highPrioQueue, asdu);
+}
 
-    //return sendASDUInternal(con, asdu);
+
+static bool
+_IMasterConnection_sendASDUEx(IMasterConnection self, CS101_ASDU asdu, bool bypassQueue)
+{
+    if (bypassQueue)
+    {
+        MasterConnection con = (MasterConnection)self->object;
+
+        if (MessageQueue_isAsduAvailable(con->lowPrioQueue, NULL) || HighPriorityASDUQueue_isAsduAvailable(con->highPrioQueue))
+            return false;
+
+        return sendASDUInternal(con, asdu, true);
+    }
+    else
+        return _IMasterConnection_sendASDU(self, asdu);
 }
 
 static bool
@@ -3849,7 +3862,7 @@ _IMasterConnection_getPeerAddress(IMasterConnection self, char* addrBuf, int add
         return 0;
     }
 
-    char* addrStr = Socket_getPeerAddressStatic(con->socket, buf);
+    const char* addrStr = Socket_getPeerAddressStatic(con->socket, buf);
 
     if (addrStr == NULL)
         return 0;
@@ -3893,6 +3906,7 @@ MasterConnection_create(CS104_Slave slave)
         self->iMasterConnection.getApplicationLayerParameters = _IMasterConnection_getApplicationLayerParameters;
         self->iMasterConnection.isReady = _IMasterConnection_isReady;
         self->iMasterConnection.sendASDU = _IMasterConnection_sendASDU;
+        self->iMasterConnection.sendASDUEx = _IMasterConnection_sendASDUEx;
         self->iMasterConnection.sendACT_CON = _IMasterConnection_sendACT_CON;
         self->iMasterConnection.sendACT_TERM = _IMasterConnection_sendACT_TERM;
         self->iMasterConnection.close = _IMasterConnection_close;

@@ -92,6 +92,20 @@ bool
 IMasterConnection_sendASDU(IMasterConnection self, CS101_ASDU asdu);
 
 /**
+ * \brief Send an ASDU to the client/master
+ *
+ * NOTE: ASDU instance has to be released by the caller!
+ *
+ * \param self the connection object (this is usually received as a parameter of a callback function)
+ * \param asdu the ASDU to send to the client/master
+ * \param bypassQueue if true, the ASDU is sent immediately bypassing any queue
+ *
+ * \return true when the ASDU has been sent or queued for transmission, false otherwise
+ */
+bool
+IMasterConnection_sendASDUEx(IMasterConnection self, CS101_ASDU asdu, bool bypassQueue);
+
+/**
  * \brief Send an ACT_CON ASDU to the client/master
  *
  * ACT_CON is used for a command confirmation (positive or negative)

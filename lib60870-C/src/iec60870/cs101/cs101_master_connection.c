@@ -36,6 +36,15 @@ IMasterConnection_sendASDU(IMasterConnection self, CS101_ASDU asdu)
 }
 
 bool
+IMasterConnection_sendASDUEx(IMasterConnection self, CS101_ASDU asdu, bool bypassQueue)
+{
+    if (self->sendASDUEx)
+        return self->sendASDUEx(self, asdu, bypassQueue);
+    else
+        return self->sendASDU(self, asdu);
+}
+
+bool
 IMasterConnection_sendACT_CON(IMasterConnection self, CS101_ASDU asdu, bool negative)
 {
     return self->sendACT_CON(self, asdu, negative);

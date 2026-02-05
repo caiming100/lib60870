@@ -883,6 +883,7 @@ typedef struct sIPeerConnection* IPeerConnection;
 struct sIPeerConnection {
     bool (*isReady) (IPeerConnection self);
     bool (*sendASDU) (IPeerConnection self, CS101_ASDU asdu);
+    bool (*sendASDUEx) (IPeerConnection self, CS101_ASDU asdu, bool bypassQueue);
     bool (*sendACT_CON) (IPeerConnection self, CS101_ASDU asdu, bool negative);
     bool (*sendACT_TERM) (IPeerConnection self, CS101_ASDU asdu);
     void (*close) (IPeerConnection self);
@@ -894,8 +895,28 @@ struct sIPeerConnection {
 bool
 IPeerConnection_isReady(IPeerConnection self);
 
+/**
+ * \brief Send an ASDU to the peer
+ *
+ * \param self the peer connection instance
+ * \param asdu the ASDU to be sent
+ *
+ * \return true when the ASDU has been accepted for transmission, false otherwise
+ */
 bool
 IPeerConnection_sendASDU(IPeerConnection self, CS101_ASDU asdu);
+
+/**
+ * \brief Send an ASDU to the peer
+ *
+ * \param self the peer connection instance
+ * \param asdu the ASDU to be sent
+ * \param bypassQueue when true the ASDU will be sent immediately, bypassing any internal send queue
+ *
+ * \return true when the ASDU has been accepted for transmission, false otherwise
+ */
+bool
+IPeerConnection_sendASDUEx(IPeerConnection self, CS101_ASDU asdu, bool bypassQueue);
 
 bool
 IPeerConnection_sendACT_CON(IPeerConnection self, CS101_ASDU asdu, bool negative);
