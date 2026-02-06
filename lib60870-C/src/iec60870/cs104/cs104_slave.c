@@ -2118,6 +2118,12 @@ sendASDUInternal(MasterConnection self, CS101_ASDU asdu, bool dontQueueIfBufferF
 #endif
             asduSent = HighPriorityASDUQueue_enqueue(self->highPrioQueue, asdu);
         }
+        else
+        {
+#if (CONFIG_USE_SEMAPHORES == 1)
+            Semaphore_post(self->sentASDUsLock);
+#endif
+        }
     }
 
     if (asduSent == false)
