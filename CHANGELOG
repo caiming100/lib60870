@@ -3,8 +3,9 @@ Changes to version 2.4.0
 
 - Added function CS104_Connection_isConnected
 - TLS integration code for mbedtls 2.28 and 3.6 updated for better compliance with IEC 62351 security event requirements
+- TLS (mbedtls 3.6): explicitely disabled hostname verfication to avoid problem with mbedtls 3.6.3 and later
 - updated minimum required cmake version to be compatible with cmake 4.0
-- added integration code for secure authentication (IEC 60870-5-7) module
+- added integration code for secure authentication (IEC 60870-5-7:2013) module (the actual secure authentication code is available as commercial add-on)
 - CS104 slave: added functions to set callback handlers for reset process and delay acquisition commands (#137)
 - CS101/CS104 slave: only allow known CAA for internally handled commands -> added callback CS101_IsCAAllowedHandler (LIB8705-126)
 - CS101/CS104 slave: reject commands with broadcast CA when not allowed for command type (LIB8705-130)
@@ -12,6 +13,12 @@ Changes to version 2.4.0
 - CS104 slave: fixed detection of unconfirmed messages when connection is closed
 - CS104 client: added threadless operation mode (CS104_Connection_startThreadless/stopThreadless/run) and example cs104_client_no_threads (LIB8705-134)
 - CS104 client: implemented T1 timeout when waiting for STARTDT/STOPDT confirmation messages
+- Added IMasterConnection_sendASDUEx to allow bypassing queues for correct message ordering in GI responses (LIB8705-149)
+- updated CS 104 server example to show standard compliant interrogation handling
+- fix: CS104 client is sending same S message multiple times when sending STOPDT_ACT (LIB8705-150)
+- fix: slave is sending STOP-DT CON when there are unconfirmed sent I messages from the high prio queue (LIB8705-148)
+- added some warning/alarms to mbedtls 2.28 integration to comply with IEC 62351-100-3 test cases
+
 
 Changes to version 2.3.6
 ------------------------

@@ -1,4 +1,4 @@
-= lib60870 - IEC 60870-5-101/104 C Source Code Library User Guide - Version 2.3.6
+= lib60870 - IEC 60870-5-101/104 C Source Code Library User Guide - Version 2.4.0
 Copyright 2020 MZ Automation GmbH
 
 == Introduction
@@ -18,7 +18,12 @@ Here is a list of supported features:
 * Slave/Server supports sending data messages in monitoring direction and commands in reverse direction
 * The list of supported ASDU types can be found in the annex
 * The library supports user defined private ASDU types
-* Plugin interface for library extensions
+* Plugin interface for library extensions (deprecated)
+* IEC 62351-3 compliant TLS encryption and authentication for CS 104 (requires mbedtls 2.28 or mbedtls 3.6 as external dependencies)
+* Support for Windows, Linux, and other POSIX compliant operating systems
+* For implementation on mircocontrollers with limited resources the library can be compiled without dynamic memory allocation during runtime (see configuration section)
+* Support for secure authentication (IEC 60870-5-7 version 2013) is available for CS 101 and CS 104 as a commercial extension (contact MZ Automation for details)
+
 
 *NOTE:* CS stands for "companion standard" and specifies variants of the communication protocols and services defined in the IEC 60870-5 standard series.
 
@@ -546,50 +551,7 @@ On the server side you should use the InterrogationHandler callback function to 
 
 According to the specification the server has to respond the ACTIVATION request from the client with the ACT_CON response followed by ASDUs containing the information objects with _CS101_COT_INTERROGATED_BY_STATION_ for a station interrogation or COT that represent the respective interrogation group (e.g. _CS101_COT_INTERROGATED_BY_GROUP_1_ for interrogation group 1). After sending all information objects the server has to send the initial interrogation command message with COT = _CS101_COT_ACTIVATION_TERMINATION_ to indicate that the transmission of the interrogation data is finished.
 
-[[app-listing]]
-[source, c]
-.Example how to implement an interrogation handler
-----
-static bool
-interrogationHandler(void* parameter, IMasterConnection connection, CS101_ASDU asdu, uint8_t qoi)
-{
-    if (qoi == 20) { /* only handle station interrogation */
-
-        CS101_AppLayerParameters alParams = IMasterConnection_getApplicationLayerParameters(connection);
-
-        IMasterConnection_sendACT_CON(connection, asdu, false);
-
-        CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_INTERROGATED_BY_STATION,
-                0, 1, false, false);
-
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 100, -1, IEC60870_QUALITY_GOOD);
-
-        CS101_ASDU_addInformationObject(newAsdu, io);
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            MeasuredValueScaled_create((MeasuredValueScaled) io, 101, 23, IEC60870_QUALITY_GOOD));
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            MeasuredValueScaled_create((MeasuredValueScaled) io, 102, 2300, IEC60870_QUALITY_GOOD));
-
-        InformationObject_destroy(io);
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        CS101_ASDU_destroy(newAsdu);
-
-        IMasterConnection_sendACT_TERM(connection, asdu);
-    }
-    else {
-        IMasterConnection_sendACT_CON(connection, asdu, true);
-    }
-
-    return true;
-}
-----
-
-Inside of the interrogation handler the IMasterConnection interface can be used to send the interrogated data
-back to the client/master. The _CS101_ASDU_ and _InformationObject_ instances created inside the interrogation handler are in the responsibility of the user and have to be released with the appropriate functions (_CS101_ASDU_destroy_ and _InformationObject_destroy_) when they have been allocated dynamically before.
+The interrogation handler should be used to trigger the transmission of the interrogation data. The actual data should be sent outside of the handler function. Please have a look at the server example for a simple implementation of the interrogation handling.
 
 === Handling of read commands (C_RD_NA_1) ===
 
