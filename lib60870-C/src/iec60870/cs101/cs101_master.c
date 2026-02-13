@@ -888,6 +888,15 @@ CS101_Master_pollSingleSlave(CS101_Master self, int address)
 }
 
 void
+CS101_Master_pollSingleSlaveClass1(CS101_Master self, int address)
+{
+    if (self->unbalancedLinkLayer)
+    {
+        LinkLayerPrimaryUnbalanced_requestClass1Data(self->unbalancedLinkLayer, address);
+    }
+}
+
+void
 CS101_Master_setASDUReceivedHandler(CS101_Master self, CS101_ASDUReceivedHandler handler, void* parameter)
 {
     self->asduReceivedHandler = handler;

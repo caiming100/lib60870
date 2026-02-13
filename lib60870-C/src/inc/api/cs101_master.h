@@ -157,6 +157,23 @@ void
 CS101_Master_pollSingleSlave(CS101_Master self, int address);
 
 /**
+ * \brief Poll a slave for class 1 data (only unbalanced mode)
+ *
+ * NOTE: This command will instruct the unbalanced link layer to send a
+ * request for class 1 data. Usually the \ref CS101_Master_pollSingleSlave function
+ * is sufficient as it requests both class 1 and class 2 data. This function
+ * immediately requests class 1 data and can be used when the master is especially
+ * interested in class 1 data and does not want to wait for the next regular poll to
+ * request class 1 data.
+ * E.g. when a command has been sent and the master wants to receive the command
+ * response as fast as possible.
+ *
+ * \param address the link layer address of the slave
+ */
+void
+CS101_Master_pollSingleSlaveClass1(CS101_Master self, int address);
+
+/**
  * \brief Destroy the master instance and release all resources
  */
 void
