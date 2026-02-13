@@ -366,6 +366,15 @@ void
 CS101_Slave_setRawMessageHandler(CS101_Slave self, IEC60870_RawMessageHandler handler, void* parameter);
 
 /**
+ * \brief Set the handler to get the next ASDU for an interrogation response (used for interrogation response data)
+ *
+ * \param handler the callback handler function
+ * \param parameter user provided parameter to be passed to the callback handler
+ */
+void
+CS101_Slave_setGetNextInterrogationASDUHandler(CS101_Slave self, CS101_GetNextInterrogationASDUHandler handler, void* parameter);
+
+/**
  * @}
  */
 

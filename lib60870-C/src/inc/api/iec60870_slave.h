@@ -275,6 +275,21 @@ typedef bool (*CS101_DelayAcquisitionHandler) (void* parameter, IMasterConnectio
 typedef bool (*CS101_ASDUHandler) (void* parameter, IMasterConnection connection, CS101_ASDU asdu);
 
 /**
+ * \brief Callback handler to get the next ASDU for an interrogation response (used for GI responses)
+ *
+ * NOTE: This handler will be called when the slave is ready to transmit the next ASDU for the interrogation response.
+ * In unbalanced mode, this callback is called when the slave receives a REQ UD 2 message from the master.
+ * The returned ASDU will bypass the class 2 queue.
+ * The handler should return the next ASDU to send, or NULL if no more ASDU is available to send.
+ *
+ * \param parameter user provided parameter
+ * \param connection represents the (TCP) connection that received the interrogation command
+ *
+ * \return the next ASDU to send in response to the interrogation command, or NULL if no data is available to send
+ */
+typedef CS101_ASDU (*CS101_GetNextInterrogationASDUHandler) (void* parameter, IMasterConnection connection);
+
+/**
  * \brief Handler that allows the application to inform the slave library if a specific CA is allowed/available
  *
  * \note this handler is called whenever such a check is required by the library (e.g. when a ASDU is received)

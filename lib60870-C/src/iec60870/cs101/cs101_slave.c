@@ -1,7 +1,7 @@
 /*
  *  cs101_slave.c
  *
- *  Copyright 2017-2025 Michael Zillgith
+ *  Copyright 2017-2026 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -74,6 +74,9 @@ struct sCS101_Slave
 
     CS101_IsCAAllowedHandler isCAAllowedHandler;
     void* isCAAllowedHandlerParameter;
+
+    CS101_GetNextInterrogationASDUHandler getNextInterrogationASDUHandler;
+    void* getNextInterrogationASDUHandlerParameter;
 
     SerialTransceiverFT12 transceiver;
 
@@ -350,6 +353,18 @@ GetClass2Data(void* parameter, Frame frame)
     if (pluginData)
         return pluginData;
 
+    if (self->getNextInterrogationASDUHandler)
+    {
+        CS101_ASDU asdu = self->getNextInterrogationASDUHandler(self->getNextInterrogationASDUHandlerParameter, &(self->iMasterConnection));
+
+        if (asdu)
+        {
+            CS101_ASDU_encode(asdu, frame);
+
+            return frame;
+        }
+    }
+
     CS101_Queue_lock(&(self->userDataClass2Queue));
 
     Frame userData = CS101_Queue_dequeue(&(self->userDataClass2Queue), frame);
@@ -418,55 +433,14 @@ static struct sISecondaryApplicationLayer cs101UnbalancedAppLayerInterface =
 /********************************************
  * IBalancedApplicationLayer
  ********************************************/
-static bool
-IsClass2DataAvailable(void* parameter)
-{
-    CS101_Slave self = (CS101_Slave)parameter;
-
-#ifdef SEC_AUTH_60870_5_7
-    if (self->secureEndpoint)
-    {
-        if (SecureEndpoint_hasWaitingAsdu(self->secureEndpoint))
-            return true;
-
-        {
-            bool hasClassData = false;
-
-            CS101_Queue_lock(&(self->userDataClass2Queue));
-
-            TypeID typeId;
-            if (CS101_Queue_hasWaitingAsdu(&(self->userDataClass2Queue), &typeId) && (typeId == M_EI_NA_1))
-            {
-                hasClassData = true;
-            }
-
-            CS101_Queue_unlock(&(self->userDataClass2Queue));
-
-            return hasClassData;
-        }
-
-        if (SecureEndpoint_sessionReady(self->secureEndpoint) == false)
-        {
-            return false;
-        }
-    }
-#endif /* SEC_AUTH_60870_5_7 */
-
-    if (checkPluginsForPendingData(self))
-        return true;
-
-    return (CS101_Queue_isEmpty(&(self->userDataClass2Queue)) == false);
-}
 
 static Frame
 IBalancedApplicationLayer_GetUserData(void* parameter, Frame frame)
 {
     if (IsClass1DataAvailable(parameter))
         return GetClass1Data(parameter, frame);
-    else if (IsClass2DataAvailable(parameter))
-        return GetClass2Data(parameter, frame);
     else
-        return NULL;
+        return GetClass2Data(parameter, frame);
 }
 
 static bool
@@ -569,6 +543,8 @@ CS101_Slave_createEx(SerialPort serialPort, const LinkLayerParameters llParamete
         self->resetProcessHandler = NULL;
         self->delayAcquisitionHandler = NULL;
         self->resetCUHandler = NULL;
+        self->isCAAllowedHandler = NULL;
+        self->getNextInterrogationASDUHandler = NULL;
 
 #if (CONFIG_USE_THREADS == 1)
         self->isRunning = false;
@@ -1380,4 +1356,11 @@ void
 CS101_Slave_setRawMessageHandler(CS101_Slave self, IEC60870_RawMessageHandler handler, void* parameter)
 {
     SerialTransceiverFT12_setRawMessageHandler(self->transceiver, handler, parameter);
+}
+
+void
+CS101_Slave_setGetNextInterrogationASDUHandler(CS101_Slave self, CS101_GetNextInterrogationASDUHandler handler, void* parameter)
+{
+    self->getNextInterrogationASDUHandler = handler;
+    self->getNextInterrogationASDUHandlerParameter = parameter;
 }

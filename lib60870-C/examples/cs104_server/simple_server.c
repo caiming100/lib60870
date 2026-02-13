@@ -200,6 +200,7 @@ handleGeneralInterrogation(CS104_Slave slave)
     Semaphore_post(gi_stateLock);
 }
 
+/* Callback handler that is called when an interrogation command is received */
 static bool
 interrogationHandler(void* parameter, IMasterConnection connection, CS101_ASDU asdu, uint8_t qoi)
 {
