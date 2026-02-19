@@ -36,7 +36,7 @@
 #define SEC_EVENT_INFO 0
 
 #ifndef CONFIG_DEBUG_TLS
-#define CONFIG_DEBUG_TLS 1
+#define CONFIG_DEBUG_TLS 0
 #endif
 
 #if (CONFIG_DEBUG_TLS == 1)
@@ -896,7 +896,6 @@ TLSConfiguration_create()
 
         mbedtls_ssl_conf_renegotiation(&(self->conf), MBEDTLS_SSL_RENEGOTIATION_ENABLED);
 
-        /* Allow legacy renegotiation to support client-initiated renegotiation */
         mbedtls_ssl_conf_legacy_renegotiation(&(self->conf), MBEDTLS_SSL_LEGACY_NO_RENEGOTIATION);
 
         self->minVersion = TLS_VERSION_TLS_1_2;

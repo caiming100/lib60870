@@ -166,7 +166,8 @@ raiseSecurityEvent(TLSConfiguration config, TLSEventLevel eventCategory, int eve
     }
 }
 
-static TLSConfigVersion getTLSVersion(mbedtls_ssl_context* ssl)
+static TLSConfigVersion
+getTLSVersion(mbedtls_ssl_context* ssl)
 {
     mbedtls_ssl_protocol_version version = mbedtls_ssl_get_version_number(ssl);
 
