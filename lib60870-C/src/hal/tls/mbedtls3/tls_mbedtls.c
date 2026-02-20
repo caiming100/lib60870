@@ -1080,7 +1080,7 @@ TLSConfiguration_addCACertificateFromFile(TLSConfiguration self, const char* fil
 }
 
 static void
-udpatedCRL(TLSConfiguration self)
+updatedCRL(TLSConfiguration self)
 {
     self->crlUpdated = Hal_getMonotonicTimeInMs();
 
@@ -1105,7 +1105,7 @@ TLSConfiguration_addCRL(TLSConfiguration self, uint8_t* crl, int crlLen)
     }
     else
     {
-        udpatedCRL(self);
+        updatedCRL(self);
     }
 
     return (ret == 0);
@@ -1123,7 +1123,7 @@ TLSConfiguration_addCRLFromFile(TLSConfiguration self, const char* filename)
     }
     else
     {
-        udpatedCRL(self);
+        updatedCRL(self);
     }
 
     return (ret == 0);

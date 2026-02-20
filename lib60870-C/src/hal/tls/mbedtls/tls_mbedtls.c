@@ -152,7 +152,7 @@ struct sTLSConfiguration
     bool setupComplete;
 
     bool useSessionResumption;
-    int sessionResumptionInterval; /* session resumption interval in seconds */
+    int sessionResumptionInterval; /* session resumption interval in milliseconds */
 
     int* ciphersuites;
     int maxCiphersuites;
@@ -703,7 +703,7 @@ verifyCertificate(void* parameter, mbedtls_x509_crt* crt, int certificate_depth,
             if (isCAAvailableForCert(self->tlsConfig, crt) == false)
             {
                 raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_CA_CERT_NOT_AVAILABLE,
-                                   "Alarm: CA certificate not available for peer certificate", self);
+                                   "Alarm: certificate validation: CA certificate not available", self);
 
                 *flags |= MBEDTLS_X509_BADCERT_NOT_TRUSTED;
                 return MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ;
@@ -734,7 +734,7 @@ verifyCertificate(void* parameter, mbedtls_x509_crt* crt, int certificate_depth,
             {
                 *flags = *flags - MBEDTLS_X509_BADCRL_EXPIRED;
 
-                raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_WRN_CRL_EXPIRED, "Warning: certificate validation: using expired CRL", self);
+                raiseSecurityEvent(self->tlsConfig, TLS_SEC_EVT_WARNING, TLS_EVENT_CODE_WRN_CRL_EXPIRED, "Warning: CRL expired", self);
             }
 
             if (*flags & MBEDTLS_X509_BADCERT_FUTURE)
@@ -919,7 +919,7 @@ TLSConfiguration_create()
         self->eventHandlerParameter = NULL;
 
         self->useSessionResumption = true;
-        self->sessionResumptionInterval = 21600; /* default value: 6h */
+        self->sessionResumptionInterval = 21600000; /* default value: 6h */
         self->savedSession = NULL;
         self->savedSessionTime = 0;
         self->savedSessionVersion = TLS_VERSION_NOT_SELECTED;
@@ -968,12 +968,12 @@ TLSConfiguration_enableSessionResumption(TLSConfiguration self, bool enable)
 void
 TLSConfiguration_setSessionResumptionInterval(TLSConfiguration self, int intervalInSeconds)
 {
-    self->sessionResumptionInterval = intervalInSeconds;
+    self->sessionResumptionInterval = intervalInSeconds * 1000; /* convert to milliseconds */
 
     if (self->conf.endpoint == MBEDTLS_SSL_IS_SERVER &&
         self->serverSessionCache.initialized)
     {
-        self->serverSessionCache.timeout = intervalInSeconds;
+        self->serverSessionCache.timeout = intervalInSeconds * 1000; /* convert to milliseconds */
     }
 }
 
@@ -1131,7 +1131,7 @@ TLSConfiguration_addCACertificateFromFile(TLSConfiguration self, const char* fil
 }
 
 static void
-udpatedCRL(TLSConfiguration self)
+updatedCRL(TLSConfiguration self)
 {
     self->crlUpdated = Hal_getMonotonicTimeInMs();
 
@@ -1156,7 +1156,7 @@ TLSConfiguration_addCRL(TLSConfiguration self, uint8_t* crl, int crlLen)
     }
     else
     {
-        udpatedCRL(self);
+        updatedCRL(self);
     }
 
     return (ret == 0);
@@ -1174,7 +1174,7 @@ TLSConfiguration_addCRLFromFile(TLSConfiguration self, const char* filename)
     }
     else
     {
-        udpatedCRL(self);
+        updatedCRL(self);
     }
 
     return (ret == 0);
@@ -1283,7 +1283,7 @@ createSecurityEvents(TLSConfiguration config, int ret, uint32_t flags, TLSSocket
         break;
 
     case MBEDTLS_ERR_SSL_NO_CIPHER_CHOSEN:
-        raiseSecurityEvent(config, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_NO_CIPHER, "Alarm: no matching TLS ciphers", socket);
+        raiseSecurityEvent(config, TLS_SEC_EVT_INCIDENT, TLS_EVENT_CODE_ALM_NO_CIPHER, "Alarm: no matching TLS cipher suites", socket);
         break;
 
     case MBEDTLS_ERR_SSL_NO_USABLE_CIPHERSUITE:
@@ -1543,7 +1543,7 @@ TLSSocket_create(Socket socket, TLSConfiguration configuration, bool storeClient
             {
                 if (configuration->savedSession && configuration->savedSessionTime > 0)
                 {
-                    if (Hal_getMonotonicTimeInMs() < (configuration->savedSessionTime + configuration->sessionResumptionInterval * 1000))
+                    if (Hal_getMonotonicTimeInMs() < (configuration->savedSessionTime + configuration->sessionResumptionInterval))
                     {
                         if (configuration->savedSessionTime > 0) /* Only proceed if session wasn't invalidated */
                         {
