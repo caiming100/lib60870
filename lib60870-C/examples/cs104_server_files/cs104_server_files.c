@@ -1,93 +1,183 @@
-#include <stdlib.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 
-#include "cs104_slave.h"
 #include "cs101_file_service.h"
+#include "cs104_slave.h"
 
 #include "hal_thread.h"
 #include "hal_time.h"
 
 static bool running = true;
 
+static int gi_state = 0; /* 0 - no GI running, 1 - GI is running */
+static IMasterConnection gi_connection = NULL;
+static int gi_progress = 0;
+static int gi_oa = 0; /* originator address */
+static Semaphore gi_lock;
+
 void
 sigint_handler(int signalId)
 {
+    (void)signalId;
     running = false;
 }
 
 static sCS101_StaticASDU _asdu;
 static uint8_t ioBuf[250];
 
+static void
+handleGeneralInterrogation()
+{
+    Semaphore_wait(gi_lock);
+
+    if (gi_state == 1)
+    {
+        CS101_AppLayerParameters alParams = IMasterConnection_getApplicationLayerParameters(gi_connection);
+
+        if (gi_progress == 0)
+        {
+            /* send scaled values */
+            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&_asdu, alParams, false, CS101_COT_INTERROGATED_BY_STATION,
+                                                             gi_oa, 1, false, false);
+
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject)MeasuredValueScaled_create(
+                                                         (MeasuredValueScaled)&ioBuf, 100, -1, IEC60870_QUALITY_GOOD));
+
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject)MeasuredValueScaled_create(
+                                                         (MeasuredValueScaled)&ioBuf, 101, 23, IEC60870_QUALITY_GOOD));
+
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)MeasuredValueScaled_create((MeasuredValueScaled)&ioBuf, 102, 2300,
+                                                                       IEC60870_QUALITY_GOOD));
+
+            IMasterConnection_sendASDU(gi_connection, newAsdu);
+
+            gi_progress = 1;
+        }
+        else if (gi_progress == 1)
+        {
+            /* send single points */
+            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&_asdu, alParams, false, CS101_COT_INTERROGATED_BY_STATION,
+                                                             gi_oa, 1, false, false);
+
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 104, true,
+                                                                          IEC60870_QUALITY_GOOD));
+
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 105, false,
+                                                                          IEC60870_QUALITY_GOOD));
+
+            IMasterConnection_sendASDU(gi_connection, newAsdu);
+
+            gi_progress = 2;
+        }
+        else if (gi_progress == 2)
+        {
+            /* send more single points */
+            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&_asdu, alParams, true, CS101_COT_INTERROGATED_BY_STATION,
+                                                             gi_oa, 1, false, false);
+
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 300, true,
+                                                                          IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 301, false,
+                                                                          IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 302, true,
+                                                                          IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 303, false,
+                                                                          IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 304, true,
+                                                                          IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 305, false,
+                                                                          IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 306, true,
+                                                                          IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 307, false,
+                                                                          IEC60870_QUALITY_GOOD));
+
+            IMasterConnection_sendASDU(gi_connection, newAsdu);
+
+            gi_progress = 3;
+        }
+        else if (gi_progress == 3)
+        {
+            /* send even more single points */
+            for (int i = 0; i < 30; i++)
+            {
+                CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(
+                    &_asdu, alParams, true, CS101_COT_INTERROGATED_BY_STATION, gi_oa, 1, false, false);
+
+                CS101_ASDU_addInformationObject(
+                    newAsdu, (InformationObject)SinglePointInformation_create((SinglePointInformation)&ioBuf, 400 + i,
+                                                                              true, IEC60870_QUALITY_GOOD));
+
+                IMasterConnection_sendASDU(gi_connection, newAsdu);
+            }
+
+            gi_progress = 4;
+        }
+        else if (gi_progress == 4)
+        {
+            /* send termination message */
+            CS101_ASDU tempAsdu =
+                CS101_ASDU_create(alParams, false, CS101_COT_INTERROGATED_BY_STATION, gi_oa, 1, false, false);
+
+            IMasterConnection_sendACT_TERM(gi_connection, tempAsdu);
+
+            CS101_ASDU_destroy(tempAsdu);
+
+            gi_state = 0;
+            gi_connection = NULL;
+        }
+    }
+
+    Semaphore_post(gi_lock);
+}
 
 static bool
 interrogationHandler(void* parameter, IMasterConnection connection, CS101_ASDU asdu, uint8_t qoi)
 {
     printf("Received interrogation for group %i\n", qoi);
 
-    if (qoi == 20) { /* only handle station interrogation */
+    if (CS101_ASDU_getCA(asdu) != 1)
+    {
+        printf("Unknown CA: %i\n", CS101_ASDU_getCA(asdu));
+        return false;
+    }
 
-        CS101_AppLayerParameters alParams = IMasterConnection_getApplicationLayerParameters(connection);
+    if (qoi == 20) /* only handle station interrogation */
+    {
+        Semaphore_wait(gi_lock);
 
-        IMasterConnection_sendACT_CON(connection, asdu, false);
+        if (gi_state == 0)
+        {
+            gi_state = 1;
+            gi_connection = connection;
+            gi_progress = 0;
+            gi_oa = CS101_ASDU_getOA(asdu);
 
-        /* The CS101 specification only allows information objects without timestamp in GI responses */
-
-        CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&_asdu, alParams, false, CS101_COT_INTERROGATED_BY_STATION,
-                0, 1, false, false);
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            MeasuredValueScaled_create((MeasuredValueScaled) &ioBuf, 100, -1, IEC60870_QUALITY_GOOD));
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            MeasuredValueScaled_create((MeasuredValueScaled) &ioBuf, 101, 23, IEC60870_QUALITY_GOOD));
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            MeasuredValueScaled_create((MeasuredValueScaled) &ioBuf, 102, 2300, IEC60870_QUALITY_GOOD));
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-
-        newAsdu = CS101_ASDU_initializeStatic(&_asdu, alParams, false, CS101_COT_INTERROGATED_BY_STATION,
-                    0, 1, false, false);
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            SinglePointInformation_create((SinglePointInformation) &ioBuf, 104, true, IEC60870_QUALITY_GOOD));
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            SinglePointInformation_create((SinglePointInformation) &ioBuf, 105, false, IEC60870_QUALITY_GOOD));
-
-        IMasterConnection_sendASDU(connection, newAsdu);;
-
-        newAsdu = CS101_ASDU_initializeStatic(&_asdu, alParams, true, CS101_COT_INTERROGATED_BY_STATION,
-                0, 1, false, false);
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 300, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 301, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 302, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 303, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 304, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 305, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 306, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 307, false, IEC60870_QUALITY_GOOD));
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        for (int i = 0; i < 30; i++) {
-            newAsdu = CS101_ASDU_initializeStatic(&_asdu, alParams, true, CS101_COT_INTERROGATED_BY_STATION,
-                    0, 1, false, false);
-
-            CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) &ioBuf, 400 +
-                     i, true, IEC60870_QUALITY_GOOD));
-
-            IMasterConnection_sendASDU(connection, newAsdu);
+            IMasterConnection_sendACT_CON(connection, asdu, false);
+        }
+        else
+        {
+            IMasterConnection_sendACT_CON(connection, asdu, true);
         }
 
-        IMasterConnection_sendACT_TERM(connection, asdu);
+        Semaphore_post(gi_lock);
     }
-    else {
+    else
+    {
         IMasterConnection_sendACT_CON(connection, asdu, true);
     }
 
@@ -101,17 +191,18 @@ asduHandler(void* parameter, IMasterConnection connection, CS101_ASDU asdu)
     {
         printf("received single command\n");
 
-        if  (CS101_ASDU_getCOT(asdu) == CS101_COT_ACTIVATION)
+        if (CS101_ASDU_getCOT(asdu) == CS101_COT_ACTIVATION)
         {
             InformationObject io = CS101_ASDU_getElement(asdu, 0);
 
             if (io)
             {
-                if (InformationObject_getObjectAddress(io) == 5000) {
-                    SingleCommand sc = (SingleCommand) io;
+                if (InformationObject_getObjectAddress(io) == 5000)
+                {
+                    SingleCommand sc = (SingleCommand)io;
 
                     printf("IOA: %i switch to %i\n", InformationObject_getObjectAddress(io),
-                            SingleCommand_getState(sc));
+                           SingleCommand_getState(sc));
 
                     CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
                 }
@@ -143,16 +234,30 @@ connectionRequestHandler(void* parameter, const char* ipAddress)
 static void
 connectionEventHandler(void* parameter, IMasterConnection con, CS104_PeerConnectionEvent event)
 {
-    if (event == CS104_CON_EVENT_CONNECTION_OPENED) {
+    if (event == CS104_CON_EVENT_CONNECTION_OPENED)
+    {
         printf("Connection opened (%p)\n", con);
     }
-    else if (event == CS104_CON_EVENT_CONNECTION_CLOSED) {
+    else if (event == CS104_CON_EVENT_CONNECTION_CLOSED)
+    {
         printf("Connection closed (%p)\n", con);
+
+        Semaphore_wait(gi_lock);
+
+        if (gi_connection == con)
+        {
+            gi_state = 0;
+            gi_connection = NULL;
+        }
+
+        Semaphore_post(gi_lock);
     }
-    else if (event == CS104_CON_EVENT_ACTIVATED) {
+    else if (event == CS104_CON_EVENT_ACTIVATED)
+    {
         printf("Connection activated (%p)\n", con);
     }
-    else if (event == CS104_CON_EVENT_DEACTIVATED) {
+    else if (event == CS104_CON_EVENT_DEACTIVATED)
+    {
         printf("Connection deactivated (%p)\n", con);
     }
 }
@@ -162,14 +267,13 @@ static uint8_t sectionData1[500];
 static uint8_t sectionData2[500];
 
 static uint64_t
-getFileDate (CS101_IFileProvider self)
+getFileDate(CS101_IFileProvider self)
 {
-
     return 0;
 }
 
 static int
-getFileSize (CS101_IFileProvider self)
+getFileSize(CS101_IFileProvider self)
 {
     printf("getFileSize --> %i\n", fileSize);
 
@@ -177,7 +281,7 @@ getFileSize (CS101_IFileProvider self)
 }
 
 static int
-getSectionSize (CS101_IFileProvider self, int sectionNumber)
+getSectionSize(CS101_IFileProvider self, int sectionNumber)
 {
     printf("getSectionSize(%i)\n", sectionNumber);
 
@@ -190,11 +294,11 @@ getSectionSize (CS101_IFileProvider self, int sectionNumber)
 }
 
 static bool
-getSegmentData (CS101_IFileProvider self, int sectionNumber, int offset, int size, uint8_t* data)
+getSegmentData(CS101_IFileProvider self, int sectionNumber, int offset, int size, uint8_t* data)
 {
     printf("getSegmentData(NoS=%i, offset=%i, size=%i)\n", sectionNumber, offset, size);
-    if (sectionNumber == 0) {
-
+    if (sectionNumber == 0)
+    {
         int i;
 
         for (i = 0; i < size; i++)
@@ -202,7 +306,8 @@ getSegmentData (CS101_IFileProvider self, int sectionNumber, int offset, int siz
 
         return true;
     }
-    else if (sectionNumber == 1) {
+    else if (sectionNumber == 1)
+    {
         int i;
 
         for (i = 0; i < size; i++)
@@ -215,7 +320,7 @@ getSegmentData (CS101_IFileProvider self, int sectionNumber, int offset, int siz
 }
 
 static void
-transferComplete (CS101_IFileProvider self, bool success)
+transferComplete(CS101_IFileProvider self, bool success)
 {
     printf("FILE TRANSFER COMPLETE\n");
 }
@@ -237,28 +342,29 @@ initializeFiles()
     fileProvider[0].transferComplete = transferComplete;
 
     int i;
-    for (i = 0; i < fileSize / 2; i++) {
-        sectionData1[i] = (uint8_t) (i % 0x100);
-        sectionData2[i] = (uint8_t) ((i + 1) % 0x100);
+    for (i = 0; i < fileSize / 2; i++)
+    {
+        sectionData1[i] = (uint8_t)(i % 0x100);
+        sectionData2[i] = (uint8_t)((i + 1) % 0x100);
     }
 }
 
-
-
 static CS101_IFileProvider
-getNextFile (void* parameter, CS101_IFileProvider continueAfter)
+getNextFile(void* parameter, CS101_IFileProvider continueAfter)
 {
     return NULL;
 }
 
 static CS101_IFileProvider
-getFile (void* parameter, int ca, int ioa, uint16_t nof, int* errCode)
+getFile(void* parameter, int ca, int ioa, uint16_t nof, int* errCode)
 {
     printf("getFile %i:%i (type:%i)\n", ca, ioa, nof);
 
     int i;
-    for (i = 0; i < numberOfFiles; i++) {
-        if ((ca == fileProvider[i].ca) && (ioa == fileProvider[i].ioa)) {
+    for (i = 0; i < numberOfFiles; i++)
+    {
+        if ((ca == fileProvider[i].ca) && (ioa == fileProvider[i].ioa))
+        {
             return &(fileProvider[i]);
         }
     }
@@ -269,11 +375,12 @@ getFile (void* parameter, int ca, int ioa, uint16_t nof, int* errCode)
 static void
 IFileReceiver_finished(CS101_IFileReceiver self, CS101_FileErrorCode result)
 {
-    FILE* fp = (FILE*) self->object;
+    FILE* fp = (FILE*)self->object;
 
     fclose(fp);
 
-    if (result != CS101_FILE_ERROR_SUCCESS) {
+    if (result != CS101_FILE_ERROR_SUCCESS)
+    {
         remove("upload.dat");
     }
 
@@ -281,9 +388,9 @@ IFileReceiver_finished(CS101_IFileReceiver self, CS101_FileErrorCode result)
 }
 
 static void
-IFileReceiver_segmentReceived (CS101_IFileReceiver self, uint8_t sectionName, int offset, int size, uint8_t* data)
+IFileReceiver_segmentReceived(CS101_IFileReceiver self, uint8_t sectionName, int offset, int size, uint8_t* data)
 {
-    FILE* fp = (FILE*) self->object;
+    FILE* fp = (FILE*)self->object;
 
     printf("File upload - section %i - offset: %i - size: %i\n", sectionName, offset, size);
 
@@ -292,13 +399,11 @@ IFileReceiver_segmentReceived (CS101_IFileReceiver self, uint8_t sectionName, in
 
 struct sCS101_IFileReceiver myFileReceiver;
 
-
-
 static CS101_IFileReceiver
-fileReadyHandler (void* parameter, int ca, int ioa, uint16_t nof, int lengthOfFile, int* err)
+fileReadyHandler(void* parameter, int ca, int ioa, uint16_t nof, int lengthOfFile, int* err)
 {
-    if ((ca == 1) && (ioa == 30001)) {
-
+    if ((ca == 1) && (ioa == 30001))
+    {
         myFileReceiver.object = fopen("upload.dat", "wb");
 
         myFileReceiver.finished = IFileReceiver_finished;
@@ -310,7 +415,8 @@ fileReadyHandler (void* parameter, int ca, int ioa, uint16_t nof, int lengthOfFi
 
         return &myFileReceiver;
     }
-    else {
+    else
+    {
         printf("Rejected file upload - unknown file\n");
 
         *err = 1;
@@ -324,6 +430,8 @@ main(int argc, char** argv)
 {
     /* Add Ctrl-C handler */
     signal(SIGINT, sigint_handler);
+
+    gi_lock = Semaphore_create(1);
 
     /* create a new slave/server instance with default connection parameters and
      * default message queue size (will provide space for 100 messages of the maximum
@@ -339,7 +447,6 @@ main(int argc, char** argv)
 
     /* get the connection parameters - we need them to create correct ASDUs */
     CS101_AppLayerParameters alParams = CS104_Slave_getAppLayerParameters(slave);
-
 
     /* set the callback handler for the interrogation command */
     CS104_Slave_setInterrogationHandler(slave, interrogationHandler, NULL);
@@ -369,7 +476,8 @@ main(int argc, char** argv)
 
     CS104_Slave_start(slave);
 
-    if (CS104_Slave_isRunning(slave) == false) {
+    if (CS104_Slave_isRunning(slave) == false)
+    {
         printf("Starting server failed!\n");
         goto exit_program;
     }
@@ -380,16 +488,20 @@ main(int argc, char** argv)
 
     while (running)
     {
-        if (Hal_getTimeInMs() >= nextSendTime) {
+        handleGeneralInterrogation();
 
+        if (Hal_getTimeInMs() >= nextSendTime)
+        {
             nextSendTime += 1000;
 
-            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&_asdu, alParams, false, CS101_COT_PERIODIC, 0, 1, false, false);
+            CS101_ASDU newAsdu =
+                CS101_ASDU_initializeStatic(&_asdu, alParams, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
             scaledValue++;
 
-            CS101_ASDU_addInformationObject(newAsdu,
-                    (InformationObject) MeasuredValueScaled_create((MeasuredValueScaled)&ioBuf, 110, scaledValue, IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(
+                newAsdu, (InformationObject)MeasuredValueScaled_create((MeasuredValueScaled)&ioBuf, 110, scaledValue,
+                                                                       IEC60870_QUALITY_GOOD));
 
             /* Add ASDU to slave event queue - don't release the ASDU afterwards!
              * The ASDU will be released by the Slave instance when the ASDU
@@ -406,4 +518,6 @@ main(int argc, char** argv)
 exit_program:
     CS104_Slave_destroy(slave);
     CS101_FileServer_destroy(fileServer);
+
+    Semaphore_destroy(gi_lock);
 }
