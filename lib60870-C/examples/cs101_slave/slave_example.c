@@ -227,8 +227,6 @@ interrogationHandler(void* parameter, IMasterConnection connection, CS101_ASDU a
         IMasterConnection_sendASDU(connection, asdu);
     }
 
-
-
     return true;
 }
 

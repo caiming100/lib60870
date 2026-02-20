@@ -2,14 +2,14 @@
  * master_example.c
  */
 
-#include "hal_time.h"
-#include "hal_thread.h"
-#include "hal_serial.h"
 #include "cs101_master.h"
+#include "hal_serial.h"
+#include "hal_thread.h"
+#include "hal_time.h"
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 
 static bool running = false;
 
@@ -21,7 +21,7 @@ sigint_handler(int signalId)
 
 /* Callback handler to log sent or received messages (optional) */
 static void
-rawMessageHandler (void* parameter, uint8_t* msg, int msgSize, bool sent)
+rawMessageHandler(void* parameter, uint8_t* msg, int msgSize, bool sent)
 {
     if (sent)
         printf("SEND: ");
@@ -29,7 +29,8 @@ rawMessageHandler (void* parameter, uint8_t* msg, int msgSize, bool sent)
         printf("RCVD: ");
 
     int i;
-    for (i = 0; i < msgSize; i++) {
+    for (i = 0; i < msgSize; i++)
+    {
         printf("%02x ", msg[i]);
     }
 
@@ -37,51 +38,44 @@ rawMessageHandler (void* parameter, uint8_t* msg, int msgSize, bool sent)
 }
 
 static bool
-asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
+asduReceivedHandler(void* parameter, int address, CS101_ASDU asdu)
 {
-    printf("RECVD ASDU type: %s(%i) elements: %i\n",
-            TypeID_toString(CS101_ASDU_getTypeID(asdu)),
-            CS101_ASDU_getTypeID(asdu),
-            CS101_ASDU_getNumberOfElements(asdu));
+    printf("RECVD ASDU type: %s(%i) elements: %i\n", TypeID_toString(CS101_ASDU_getTypeID(asdu)),
+           CS101_ASDU_getTypeID(asdu), CS101_ASDU_getNumberOfElements(asdu));
 
-    if (CS101_ASDU_getTypeID(asdu) == M_ME_TE_1) {
-
+    if (CS101_ASDU_getTypeID(asdu) == M_ME_TE_1)
+    {
         printf("  measured scaled values with CP56Time2a timestamp:\n");
 
         int i;
 
-        for (i = 0; i < CS101_ASDU_getNumberOfElements(asdu); i++) {
-
-            MeasuredValueScaledWithCP56Time2a io =
-                    (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu, i);
+        for (i = 0; i < CS101_ASDU_getNumberOfElements(asdu); i++)
+        {
+            MeasuredValueScaledWithCP56Time2a io = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu, i);
 
             if (io)
             {
-                printf("    IOA: %i value: %i\n",
-                        InformationObject_getObjectAddress((InformationObject) io),
-                        MeasuredValueScaled_getValue((MeasuredValueScaled) io)
-                );
+                printf("    IOA: %i value: %i\n", InformationObject_getObjectAddress((InformationObject)io),
+                       MeasuredValueScaled_getValue((MeasuredValueScaled)io));
 
                 MeasuredValueScaledWithCP56Time2a_destroy(io);
             }
         }
     }
-    else if (CS101_ASDU_getTypeID(asdu) == M_SP_NA_1) {
+    else if (CS101_ASDU_getTypeID(asdu) == M_SP_NA_1)
+    {
         printf("  single point information:\n");
 
         int i;
 
-        for (i = 0; i < CS101_ASDU_getNumberOfElements(asdu); i++) {
-
-            SinglePointInformation io =
-                    (SinglePointInformation) CS101_ASDU_getElement(asdu, i);
+        for (i = 0; i < CS101_ASDU_getNumberOfElements(asdu); i++)
+        {
+            SinglePointInformation io = (SinglePointInformation)CS101_ASDU_getElement(asdu, i);
 
             if (io)
             {
-                printf("    IOA: %i value: %i\n",
-                        InformationObject_getObjectAddress((InformationObject) io),
-                        SinglePointInformation_getValue((SinglePointInformation) io)
-                );
+                printf("    IOA: %i value: %i\n", InformationObject_getObjectAddress((InformationObject)io),
+                       SinglePointInformation_getValue((SinglePointInformation)io));
 
                 SinglePointInformation_destroy(io);
             }
@@ -96,7 +90,8 @@ linkLayerStateChanged(void* parameter, int address, LinkLayerState state)
 {
     printf("Link layer state: ");
 
-    switch (state) {
+    switch (state)
+    {
     case LL_STATE_IDLE:
         printf("IDLE\n");
         break;
@@ -151,17 +146,16 @@ main(int argc, char** argv)
 
     int cycleCounter = 0;
 
-    while (running) {
-
+    while (running)
+    {
         CS101_Master_run(master);
 
         if (cycleCounter == 10)
             CS101_Master_sendInterrogationCommand(master, CS101_COT_ACTIVATION, 1, IEC60870_QOI_STATION);
 
-        if (cycleCounter == 50) {
-
-            InformationObject sc = (InformationObject)
-                    SingleCommand_create(NULL, 5000, true, false, 0);
+        if (cycleCounter == 50)
+        {
+            InformationObject sc = (InformationObject)SingleCommand_create(NULL, 5000, true, false, 0);
 
             printf("Send control command C_SC_NA_1\n");
             CS101_Master_sendProcessCommand(master, CS101_COT_ACTIVATION, 1, sc);
@@ -169,7 +163,8 @@ main(int argc, char** argv)
             InformationObject_destroy(sc);
         }
 
-        if (cycleCounter == 80) {
+        if (cycleCounter == 80)
+        {
             /* Send clock synchronization command */
             struct sCP56Time2a newTime;
 
@@ -189,5 +184,3 @@ main(int argc, char** argv)
     SerialPort_close(port);
     SerialPort_destroy(port);
 }
-
-
