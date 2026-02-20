@@ -2047,9 +2047,12 @@ sendASDU(MasterConnection self, uint8_t* buffer, int msgSize, uint64_t entryId, 
             {
                 CS101_SlavePlugin plugin = (CS101_SlavePlugin) LinkedList_getData(pluginElem);
 
-                if (plugin->sendAsdu(plugin->parameter, &(self->iMasterConnection), asdu) == CS101_PLUGIN_RESULT_HANDLED)
+                if (plugin->sendAsdu)
                 {
-                    return false;
+                    if (plugin->sendAsdu(plugin->parameter, &(self->iMasterConnection), asdu) == CS101_PLUGIN_RESULT_HANDLED)
+                    {
+                        return false;
+                    }
                 }
 
                 pluginElem = LinkedList_getNext(pluginElem);
@@ -3738,7 +3741,10 @@ connectionHandlingThread(void* parameter)
             {
                 CS101_SlavePlugin plugin = (CS101_SlavePlugin)LinkedList_getData(pluginElem);
 
-                plugin->runTask(plugin->parameter, &(self->iMasterConnection));
+                if (plugin->runTask)
+                {
+                    plugin->runTask(plugin->parameter, &(self->iMasterConnection));
+                }
 
                 pluginElem = LinkedList_getNext(pluginElem);
             }
