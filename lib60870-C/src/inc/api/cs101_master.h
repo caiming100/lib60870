@@ -1,7 +1,7 @@
 /*
  *  cs101_master.h
  *
- *  Copyright 2017-2022 Michael Zillgith
+ *  Copyright 2017-2025 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -32,6 +32,11 @@
 
 #include "iec60870_master.h"
 #include "link_layer_parameters.h"
+#include "hal_serial.h"
+
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_auth_60870_5_7.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,6 +71,21 @@ typedef struct sCS101_Master* CS101_Master;
  */
 CS101_Master
 CS101_Master_create(SerialPort port, const LinkLayerParameters llParameters, const CS101_AppLayerParameters alParameters, IEC60870_LinkLayerMode mode);
+
+/**
+ * \brief Add a plugin to extend the master functionality
+ * 
+ * \param plugin the plugin to add
+ */
+void
+CS101_Master_addPlugin(CS101_Master self, CS101_MasterPlugin plugin);
+
+#ifdef SEC_AUTH_60870_5_7
+void
+CS101_Master_setSecureEndpoint(CS101_Master self, SecureEndpoint secureEndpoint);
+
+//TODO add function to set the secure endpoint for a specific slave in unbalanced mode
+#endif /* SEC_AUTH_60870_5_7 */
 
 /**
  * \brief Create a new master instance and specify message queue size (for balanced mode)
@@ -123,7 +143,6 @@ CS101_Master_stop(CS101_Master self);
 void
 CS101_Master_addSlave(CS101_Master self, int address);
 
-
 /**
  * \brief Poll a slave (only unbalanced mode)
  *
@@ -136,6 +155,23 @@ CS101_Master_addSlave(CS101_Master self, int address);
  */
 void
 CS101_Master_pollSingleSlave(CS101_Master self, int address);
+
+/**
+ * \brief Poll a slave for class 1 data (only unbalanced mode)
+ *
+ * NOTE: This command will instruct the unbalanced link layer to send a
+ * request for class 1 data. Usually the \ref CS101_Master_pollSingleSlave function
+ * is sufficient as it requests both class 1 and class 2 data. This function
+ * immediately requests class 1 data and can be used when the master is especially
+ * interested in class 1 data and does not want to wait for the next regular poll to
+ * request class 1 data.
+ * E.g. when a command has been sent and the master wants to receive the command
+ * response as fast as possible.
+ *
+ * \param address the link layer address of the slave
+ */
+void
+CS101_Master_pollSingleSlaveClass1(CS101_Master self, int address);
 
 /**
  * \brief Destroy the master instance and release all resources
@@ -173,8 +209,6 @@ CS101_Master_setOwnAddress(CS101_Master self, int address);
  */
 void
 CS101_Master_useSlaveAddress(CS101_Master self, int address);
-
-
 
 /**
  * \brief Returns the application layer parameters object of this master instance

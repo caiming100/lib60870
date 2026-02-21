@@ -82,11 +82,14 @@ CS101_Queue_unlock(CS101_Queue self);
 void
 CS101_Queue_enqueue(CS101_Queue self, CS101_ASDU asdu);
 
-    /*
-     * NOTE: Locking has to be done by caller!
-     */
+/*
+* NOTE: Locking has to be done by caller!
+*/
 Frame
 CS101_Queue_dequeue(CS101_Queue self, Frame resultStorage);
+
+bool
+CS101_Queue_hasWaitingAsdu(CS101_Queue self, TypeID* typeId);
 
 bool
 CS101_Queue_isFull(CS101_Queue self);

@@ -36,6 +36,15 @@ IMasterConnection_sendASDU(IMasterConnection self, CS101_ASDU asdu)
 }
 
 bool
+IMasterConnection_sendASDUEx(IMasterConnection self, CS101_ASDU asdu, bool bypassQueue)
+{
+    if (self->sendASDUEx)
+        return self->sendASDUEx(self, asdu, bypassQueue);
+    else
+        return self->sendASDU(self, asdu);
+}
+
+bool
 IMasterConnection_sendACT_CON(IMasterConnection self, CS101_ASDU asdu, bool negative)
 {
     return self->sendACT_CON(self, asdu, negative);
@@ -62,6 +71,64 @@ IMasterConnection_close(IMasterConnection self)
 
 int
 IMasterConnection_getPeerAddress(IMasterConnection self, char* addrBuf, int addrBufSize)
+{
+    if (self->getPeerAddress)
+        return self->getPeerAddress(self, addrBuf, addrBufSize);
+    else
+        return 0;
+}
+
+bool
+IPeerConnection_isReady(IPeerConnection self)
+{
+    if (self->isReady)
+        return self->isReady(self);
+
+    return false;
+}
+
+bool
+IPeerConnection_sendASDU(IPeerConnection self, CS101_ASDU asdu)
+{
+    if (self->sendASDU)
+        return self->sendASDU(self, asdu);
+
+    return false;
+}
+
+bool
+IPeerConnection_sendACT_CON(IPeerConnection self, CS101_ASDU asdu, bool negative)
+{
+    if (self->sendACT_CON)
+        return self->sendACT_CON(self, asdu, negative);
+    else
+        return false;
+}
+
+bool
+IPeerConnection_sendACT_TERM(IPeerConnection self, CS101_ASDU asdu)
+{
+    if (self->sendACT_TERM)
+        return self->sendACT_TERM(self, asdu);
+    else
+        return false;
+}
+
+CS101_AppLayerParameters
+IPeerConnection_getApplicationLayerParameters(IPeerConnection self)
+{
+    return self->getApplicationLayerParameters(self);
+}
+
+void
+IPeerConnection_close(IPeerConnection self)
+{
+    if (self->close)
+        self->close(self);
+}
+
+int
+IPeerConnection_getPeerAddress(IPeerConnection self, char* addrBuf, int addrBufSize)
 {
     if (self->getPeerAddress)
         return self->getPeerAddress(self, addrBuf, addrBufSize);

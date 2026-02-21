@@ -1,7 +1,7 @@
 /*
  *  cs101_slave.c
  *
- *  Copyright 2017-2025 Michael Zillgith
+ *  Copyright 2017-2026 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -42,6 +42,10 @@
 #include "hal_thread.h"
 #endif
 
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_endpoint_int.h"
+#endif
+
 struct sCS101_Slave
 {
     CS101_InterrogationHandler interrogationHandler;
@@ -71,6 +75,9 @@ struct sCS101_Slave
     CS101_IsCAAllowedHandler isCAAllowedHandler;
     void* isCAAllowedHandlerParameter;
 
+    CS101_GetNextInterrogationASDUHandler getNextInterrogationASDUHandler;
+    void* getNextInterrogationASDUHandlerParameter;
+
     SerialTransceiverFT12 transceiver;
 
     LinkLayerSecondaryUnbalanced unbalancedLinkLayer;
@@ -84,7 +91,7 @@ struct sCS101_Slave
 
     struct sCS101_Queue userDataClass2Queue;
 
-    struct sIMasterConnection iMasterConnection;
+    struct sIPeerConnection iMasterConnection;
 
     IEC60870_LinkLayerMode linkLayerMode;
 
@@ -94,19 +101,159 @@ struct sCS101_Slave
 #endif
 
     LinkedList plugins;
+
+#ifdef SEC_AUTH_60870_5_7
+    SecureEndpoint secureEndpoint;
+#endif
 };
 
 static void
-handleASDU(CS101_Slave self, CS101_ASDU asdu);
+handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin);
 
 /********************************************
  * ISecondaryApplicationLayer
  ********************************************/
 
 static bool
+checkPluginsForPendingData(CS101_Slave self)
+{
+    if (self->plugins == NULL)
+        return false;
+
+    LinkedList pluginElem = LinkedList_getNext(self->plugins);
+
+    while (pluginElem)
+    {
+        CS101_SlavePlugin plugin = (CS101_SlavePlugin) LinkedList_getData(pluginElem);
+
+        if (plugin->hasAsduToSend)
+        {
+            if (plugin->hasAsduToSend(plugin->parameter))
+                return true;
+        }
+
+        pluginElem = LinkedList_getNext(pluginElem);
+    }
+
+    return false;
+}
+
+static Frame
+getPendingDataFromPlugins(CS101_Slave self, Frame frame)
+{
+    if (self->plugins)
+    {
+        LinkedList pluginElem = LinkedList_getNext(self->plugins);
+
+        while (pluginElem)
+        {
+            CS101_SlavePlugin plugin = (CS101_SlavePlugin) LinkedList_getData(pluginElem);
+
+            if (plugin->getNextAsduToSend)
+            {
+                Frame userData = plugin->getNextAsduToSend(plugin->parameter, frame);
+
+                if (userData)
+                    return userData;
+            }
+
+            pluginElem = LinkedList_getNext(pluginElem);
+        }
+    }
+
+    return NULL;
+}
+
+static Frame
+forwardAsduToPlugins(CS101_Slave self, Frame frame)
+{
+    if (frame)
+    {
+#ifdef SEC_AUTH_60870_5_7
+        if (self->secureEndpoint)
+        {
+            BufferFrame bufFrame = (BufferFrame) frame;
+
+            struct sCS101_ASDU _asdu;
+
+            CS101_ASDU asdu = CS101_ASDU_createFromBufferEx(&_asdu, &(self->alParameters), bufFrame->buffer, bufFrame->msgSize);
+
+            if (asdu)
+            {
+                if (SecureEndpoint_sendAsdu(self->secureEndpoint, &(self->iMasterConnection), asdu) == true)
+                {
+                    return NULL;
+                }
+            }
+        }
+#endif /* SEC_AUTH_60870_5_7 */
+
+        if (self->plugins)
+        {
+            LinkedList pluginElem = LinkedList_getNext(self->plugins);
+
+            while (pluginElem)
+            {
+                CS101_SlavePlugin plugin = (CS101_SlavePlugin) LinkedList_getData(pluginElem);
+
+                if (plugin->sendAsdu)
+                {
+                    BufferFrame bufFrame = (BufferFrame) frame;
+
+                    struct sCS101_ASDU _asdu;
+
+                    CS101_ASDU asdu = CS101_ASDU_createFromBufferEx(&_asdu, &(self->alParameters), bufFrame->buffer, bufFrame->msgSize);
+
+                    if (plugin->sendAsdu(plugin->parameter, NULL, asdu) == CS101_PLUGIN_RESULT_HANDLED)
+                    {
+                        return NULL;
+                    }
+                }
+
+                pluginElem = LinkedList_getNext(pluginElem);
+            }
+        }
+    }
+
+    return frame;
+}
+
+static bool
 IsClass1DataAvailable(void* parameter)
 {
     CS101_Slave self = (CS101_Slave)parameter;
+
+#ifdef SEC_AUTH_60870_5_7
+    if (self->secureEndpoint)
+    {
+        if (SecureEndpoint_hasWaitingAsdu(self->secureEndpoint))
+            return true;
+
+        {
+            bool hasClassData = false;
+
+            CS101_Queue_lock(&(self->userDataClass1Queue));
+
+            TypeID typeId;
+            if (CS101_Queue_hasWaitingAsdu(&(self->userDataClass1Queue), &typeId) && (typeId == M_EI_NA_1))
+            {
+                hasClassData = true;
+            }
+
+            CS101_Queue_unlock(&(self->userDataClass1Queue));
+
+            return hasClassData;
+        }
+
+        if (SecureEndpoint_sessionReady(self->secureEndpoint) == false)
+        {
+            return false;
+        }
+    }
+#endif /* SEC_AUTH_60870_5_7 */
+
+    if (checkPluginsForPendingData(self))
+        return true;
 
     return (CS101_Queue_isEmpty(&(self->userDataClass1Queue)) == false);
 }
@@ -116,11 +263,49 @@ GetClass1Data(void* parameter, Frame frame)
 {
     CS101_Slave self = (CS101_Slave)parameter;
 
+#ifdef SEC_AUTH_60870_5_7
+    if (self->secureEndpoint)
+    {
+        if (SecureEndpoint_hasWaitingAsdu(self->secureEndpoint))
+        {
+            return SecureEndpoint_getNextWaitingAsdu(self->secureEndpoint, frame);
+        }
+
+        {
+            Frame userData = NULL;
+
+            CS101_Queue_lock(&(self->userDataClass1Queue));
+
+            TypeID typeId;
+            if (CS101_Queue_hasWaitingAsdu(&(self->userDataClass1Queue), &typeId) && (typeId == M_EI_NA_1))
+            {
+                userData = CS101_Queue_dequeue(&(self->userDataClass1Queue), frame);
+            }
+
+            CS101_Queue_unlock(&(self->userDataClass1Queue));
+        }
+
+        if (SecureEndpoint_sessionReady(self->secureEndpoint) == false)
+        {
+            return NULL;
+        }
+
+        //TODO add code to block messages while exchanging Challenge data!
+    }
+#endif /* SEC_AUTH_60870_5_7 */
+
+    Frame pluginData = getPendingDataFromPlugins(self, frame);
+
+    if (pluginData)
+        return pluginData;
+
     CS101_Queue_lock(&(self->userDataClass1Queue));
 
     Frame userData = CS101_Queue_dequeue(&(self->userDataClass1Queue), frame);
 
     CS101_Queue_unlock(&(self->userDataClass1Queue));
+
+    userData = forwardAsduToPlugins(self, userData);
 
     return userData;
 }
@@ -130,11 +315,63 @@ GetClass2Data(void* parameter, Frame frame)
 {
     CS101_Slave self = (CS101_Slave)parameter;
 
+#ifdef SEC_AUTH_60870_5_7
+    if (self->secureEndpoint)
+    {
+        if (SecureEndpoint_hasWaitingAsdu(self->secureEndpoint))
+        {
+            return SecureEndpoint_getNextWaitingAsdu(self->secureEndpoint, frame);
+        }
+
+        {
+            Frame userData = NULL;
+
+            CS101_Queue_lock(&(self->userDataClass2Queue));
+
+            TypeID typeId;
+            if (CS101_Queue_hasWaitingAsdu(&(self->userDataClass2Queue), &typeId) && (typeId == M_EI_NA_1))
+            {
+                userData = CS101_Queue_dequeue(&(self->userDataClass2Queue), frame);
+            }
+
+            CS101_Queue_unlock(&(self->userDataClass2Queue));
+
+            return userData;
+        }
+
+        if (SecureEndpoint_sessionReady(self->secureEndpoint) == false)
+        {
+            return NULL;
+        }
+
+        //TODO add code to block messages while exchanging Challenge data!
+    }
+#endif /* SEC_AUTH_60870_5_7 */
+
+    Frame pluginData = getPendingDataFromPlugins(self, frame);
+
+    if (pluginData)
+        return pluginData;
+
+    if (self->getNextInterrogationASDUHandler)
+    {
+        CS101_ASDU asdu = self->getNextInterrogationASDUHandler(self->getNextInterrogationASDUHandlerParameter, &(self->iMasterConnection));
+
+        if (asdu)
+        {
+            CS101_ASDU_encode(asdu, frame);
+
+            return frame;
+        }
+    }
+
     CS101_Queue_lock(&(self->userDataClass2Queue));
 
     Frame userData = CS101_Queue_dequeue(&(self->userDataClass2Queue), frame);
 
     CS101_Queue_unlock(&(self->userDataClass2Queue));
+
+    userData = forwardAsduToPlugins(self, userData);
 
     return userData;
 }
@@ -152,7 +389,7 @@ HandleReceivedData(void* parameter, uint8_t* msg, bool isBroadcast, int userData
 
     if (asdu)
     {
-        handleASDU(self, asdu);
+        handleASDU(self, asdu, NULL);
     }
     else
     {
@@ -180,8 +417,14 @@ ResetCUReceived(void* parameter, bool onlyFCB)
     }
 }
 
-static struct sISecondaryApplicationLayer cs101UnbalancedAppLayerInterface = {
-    IsClass1DataAvailable, GetClass1Data, GetClass2Data, HandleReceivedData, ResetCUReceived};
+static struct sISecondaryApplicationLayer cs101UnbalancedAppLayerInterface =
+{
+        IsClass1DataAvailable,
+        GetClass1Data,
+        GetClass2Data,
+        HandleReceivedData,
+        ResetCUReceived
+};
 
 /********************************************
  * END ISecondaryApplicationLayer
@@ -190,23 +433,14 @@ static struct sISecondaryApplicationLayer cs101UnbalancedAppLayerInterface = {
 /********************************************
  * IBalancedApplicationLayer
  ********************************************/
-static bool
-IsClass2DataAvailable(void* parameter)
-{
-    CS101_Slave self = (CS101_Slave)parameter;
-
-    return (CS101_Queue_isEmpty(&(self->userDataClass2Queue)) == false);
-}
 
 static Frame
 IBalancedApplicationLayer_GetUserData(void* parameter, Frame frame)
 {
     if (IsClass1DataAvailable(parameter))
         return GetClass1Data(parameter, frame);
-    else if (IsClass2DataAvailable(parameter))
-        return GetClass2Data(parameter, frame);
     else
-        return NULL;
+        return GetClass2Data(parameter, frame);
 }
 
 static bool
@@ -216,8 +450,11 @@ IBalancedApplicationLayer_HandleReceivedData(void* parameter, uint8_t* msg, bool
     return HandleReceivedData(parameter, msg, isBroadcast, userDataStart, userDataLength);
 }
 
-static struct sIBalancedApplicationLayer cs101BalancedAppLayerInterface = {
-    IBalancedApplicationLayer_GetUserData, IBalancedApplicationLayer_HandleReceivedData};
+static struct sIBalancedApplicationLayer cs101BalancedAppLayerInterface =
+{
+    IBalancedApplicationLayer_GetUserData,
+    IBalancedApplicationLayer_HandleReceivedData
+};
 
 /********************************************
  * END IBalancedApplicationLayer
@@ -278,14 +515,16 @@ getApplicationLayerParameters(IMasterConnection self)
  * END IMasterConnection
  *******************************************/
 
-static struct sCS101_AppLayerParameters defaultAppLayerParameters = {
+static struct sCS101_AppLayerParameters defaultAppLayerParameters =
+{
     /* .sizeOfTypeId =  */ 1,
     /* .sizeOfVSQ = */ 1,
     /* .sizeOfCOT = */ 2,
     /* .originatorAddress = */ 0,
     /* .sizeOfCA = */ 2,
     /* .sizeOfIOA = */ 3,
-    /* .maxSizeOfASDU = */ 249};
+    /* .maxSizeOfASDU = */ 249
+};
 
 CS101_Slave
 CS101_Slave_createEx(SerialPort serialPort, const LinkLayerParameters llParameters,
@@ -304,6 +543,8 @@ CS101_Slave_createEx(SerialPort serialPort, const LinkLayerParameters llParamete
         self->resetProcessHandler = NULL;
         self->delayAcquisitionHandler = NULL;
         self->resetCUHandler = NULL;
+        self->isCAAllowedHandler = NULL;
+        self->getNextInterrogationASDUHandler = NULL;
 
 #if (CONFIG_USE_THREADS == 1)
         self->isRunning = false;
@@ -359,6 +600,10 @@ CS101_Slave_createEx(SerialPort serialPort, const LinkLayerParameters llParamete
         CS101_Queue_initialize(&(self->userDataClass2Queue), class2QueueSize);
 
         self->plugins = NULL;
+
+#ifdef SEC_AUTH_60870_5_7
+        self->secureEndpoint = NULL;
+#endif
     }
 
     return self;
@@ -397,6 +642,14 @@ CS101_Slave_destroy(CS101_Slave self)
     }
 }
 
+static void
+CS101_Slave_forwardASDU(CS101_SlavePlugin plugin, void* ctx, CS101_ASDU asdu, void* connecion)
+{
+    CS101_Slave self = (CS101_Slave)ctx;
+
+    handleASDU(self, asdu, plugin);
+}
+
 void
 CS101_Slave_addPlugin(CS101_Slave self, CS101_SlavePlugin plugin)
 {
@@ -404,8 +657,25 @@ CS101_Slave_addPlugin(CS101_Slave self, CS101_SlavePlugin plugin)
         self->plugins = LinkedList_create();
 
     if (self->plugins)
+    {
+        if (plugin->setForwardAsduFunction)
+            plugin->setForwardAsduFunction(plugin->parameter, (CS101_PluginForwardAsduFunc)CS101_Slave_forwardASDU, self);
+
         LinkedList_add(self->plugins, plugin);
+    }
 }
+
+#ifdef SEC_AUTH_60870_5_7
+
+void
+CS101_Slave_setSecureEndpoint(CS101_Slave self, SecureEndpoint secureEndpoint)
+{
+    self->secureEndpoint = secureEndpoint;
+
+    SecureEndpoint_addForwardASDUFunctionForSlave(secureEndpoint, CS101_Slave_forwardASDU, self);
+}
+
+#endif /* SEC_AUTH_60870_5_7 */
 
 void
 CS101_Slave_setDIR(CS101_Slave self, bool dir)
@@ -493,6 +763,13 @@ CS101_Slave_run(CS101_Slave self)
     else
         LinkLayerBalanced_run(self->balancedLinkLayer);
 
+#ifdef SEC_AUTH_60870_5_7
+    if (self->secureEndpoint)
+    {
+        SecureEndpoint_runTask(self->secureEndpoint, &(self->iMasterConnection));
+    }
+#endif /* SEC_AUTH_60870_5_7 */
+
     /* call plugins */
     if (self->plugins)
     {
@@ -502,7 +779,8 @@ CS101_Slave_run(CS101_Slave self)
         {
             CS101_SlavePlugin plugin = (CS101_SlavePlugin)LinkedList_getData(pluginElem);
 
-            plugin->runTask(plugin->parameter, &(self->iMasterConnection));
+            if (plugin->runTask)
+                plugin->runTask(plugin->parameter, &(self->iMasterConnection));
 
             pluginElem = LinkedList_getNext(pluginElem);
         }
@@ -664,7 +942,7 @@ isBroadcastCA(CS101_Slave self, int ca)
  * Call the appropriate callbacks according to ASDU type and CoT
  */
 static void
-handleASDU(CS101_Slave self, CS101_ASDU asdu)
+handleASDU(CS101_Slave self, CS101_ASDU asdu, CS101_SlavePlugin callingPlugin)
 {
     bool messageHandled = false;
 
@@ -683,6 +961,17 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
         }
     }
 
+#ifdef SEC_AUTH_60870_5_7
+    if (self->secureEndpoint)
+    {
+        if (callingPlugin != SecureEndpoint_getSlavePlugin(self->secureEndpoint))
+        {
+            if (SecureEndpoint_asduReceived(self->secureEndpoint, &(self->iMasterConnection), asdu, NULL, 0) == true)
+                return;
+        }
+    }
+#endif /* SEC_AUTH_60870_5_7 */
+
     /* call plugins */
     if (self->plugins)
     {
@@ -692,15 +981,22 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
         {
             CS101_SlavePlugin plugin = (CS101_SlavePlugin)LinkedList_getData(pluginElem);
 
-            CS101_SlavePlugin_Result result = plugin->handleAsdu(plugin->parameter, &(self->iMasterConnection), asdu);
+            if (plugin != callingPlugin)
+            {
+                if (plugin->handleAsdu)
+                {
+                    CS101_SlavePlugin_Result result = plugin->handleAsdu(plugin->parameter, &(self->iMasterConnection), asdu);
 
-            if (result == CS101_PLUGIN_RESULT_HANDLED)
-            {
-                return;
-            }
-            else if (result == CS101_PLUGIN_RESULT_INVALID_ASDU)
-            {
-                DEBUG_PRINT("Invalid message");
+                    if (result == CS101_PLUGIN_RESULT_HANDLED)
+                    {
+                        return;
+                    }
+                    else if (result == CS101_PLUGIN_RESULT_INVALID_ASDU)
+                    {
+                        DEBUG_PRINT("Invalid message");
+                        return;
+                    }
+                }
             }
 
             pluginElem = LinkedList_getNext(pluginElem);
@@ -726,9 +1022,19 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
 
                 if (irc)
                 {
-                    if (self->interrogationHandler(self->interrogationHandlerParameter, &(self->iMasterConnection),
-                                                   asdu, InterrogationCommand_getQOI(irc)))
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)irc) != 0)
+                    {
+                        DEBUG_PRINT("CS101 SLAVE: interrogation command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
                         messageHandled = true;
+                    }
+                    else
+                    {
+                        if (self->interrogationHandler(self->interrogationHandlerParameter, &(self->iMasterConnection),
+                                                    asdu, InterrogationCommand_getQOI(irc)))
+                            messageHandled = true;
+                    }
                 }
                 else
                 {
@@ -737,7 +1043,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -756,10 +1065,20 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
 
                 if (cic)
                 {
-                    if (self->counterInterrogationHandler(self->counterInterrogationHandlerParameter,
-                                                          &(self->iMasterConnection), asdu,
-                                                          CounterInterrogationCommand_getQCC(cic)))
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)cic) != 0)
+                    {
+                        DEBUG_PRINT("CS104 SLAVE: counter interrogation command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
                         messageHandled = true;
+                    }
+                    else
+                    {
+                        if (self->counterInterrogationHandler(self->counterInterrogationHandlerParameter,
+                                                            &(self->iMasterConnection), asdu,
+                                                            CounterInterrogationCommand_getQCC(cic)))
+                            messageHandled = true;
+                    }
                 }
                 else
                 {
@@ -769,7 +1088,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -807,7 +1129,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -826,17 +1151,28 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
 
                 if (csc)
                 {
-                    if (self->clockSyncHandler(self->clockSyncHandlerParameter, &(self->iMasterConnection), asdu,
-                                               ClockSynchronizationCommand_getTime(csc)))
-                        messageHandled = true;
-
-                    if (messageHandled)
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)csc) != 0)
                     {
-                        /* send ACT-CON message */
-                        CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
-
-                        CS101_Slave_enqueueUserDataClass1(self, asdu);
+                        DEBUG_PRINT("CS104 SLAVE: time sync command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
                     }
+                    else
+                    {
+                        if (self->clockSyncHandler(self->clockSyncHandlerParameter, &(self->iMasterConnection), asdu,
+                                                ClockSynchronizationCommand_getTime(csc)))
+                            messageHandled = true;
+
+                        if (messageHandled)
+                        {
+                            /* send ACT-CON message */
+                            CS101_ASDU_setCOT(asdu, CS101_COT_ACTIVATION_CON);
+
+                            CS101_Slave_enqueueUserDataClass1(self, asdu);
+                        }
+                    }
+
+                    messageHandled = true;
                 }
                 else
                 {
@@ -861,7 +1197,7 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
 
             return;
         }
-
+	else
         {
             union uInformationObject _io;
 
@@ -916,9 +1252,20 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
 
                 if (rpc)
                 {
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)rpc) != 0)
+                    {
+                        DEBUG_PRINT("CS104 SLAVE: reset process command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
+
+                        messageHandled = true;
+                    }
+                    else
+                    {
                     if (self->resetProcessHandler(self->resetProcessHandlerParameter, &(self->iMasterConnection), asdu,
                                                   ResetProcessCommand_getQRP(rpc)))
                         messageHandled = true;
+                    }
                 }
                 else
                 {
@@ -927,7 +1274,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -955,10 +1305,21 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
 
                 if (dac)
                 {
-                    if (self->delayAcquisitionHandler(self->delayAcquisitionHandlerParameter,
-                                                      &(self->iMasterConnection), asdu,
-                                                      DelayAcquisitionCommand_getDelay(dac)))
+                    /* Verify IOA = 0 */
+                    if (InformationObject_getObjectAddress((InformationObject)dac) != 0)
+                    {
+                        DEBUG_PRINT("CS104 SLAVE: delay aquisition command has invalid IOA - should be 0\n");
+                        responseNegative(asdu, &(self->iMasterConnection), CS101_COT_UNKNOWN_IOA);
+
                         messageHandled = true;
+                    }
+                    else
+                    {
+                        if (self->delayAcquisitionHandler(self->delayAcquisitionHandlerParameter,
+                                                        &(self->iMasterConnection), asdu,
+                                                        DelayAcquisitionCommand_getDelay(dac)))
+                            messageHandled = true;
+                    }
                 }
                 else
                 {
@@ -967,7 +1328,10 @@ handleASDU(CS101_Slave self, CS101_ASDU asdu)
             }
         }
         else
+        {
             responseCOTUnknown(asdu, &(self->iMasterConnection));
+            messageHandled = true;
+        }
 
         break;
 
@@ -992,4 +1356,11 @@ void
 CS101_Slave_setRawMessageHandler(CS101_Slave self, IEC60870_RawMessageHandler handler, void* parameter)
 {
     SerialTransceiverFT12_setRawMessageHandler(self->transceiver, handler, parameter);
+}
+
+void
+CS101_Slave_setGetNextInterrogationASDUHandler(CS101_Slave self, CS101_GetNextInterrogationASDUHandler handler, void* parameter)
+{
+    self->getNextInterrogationASDUHandler = handler;
+    self->getNextInterrogationASDUHandlerParameter = parameter;
 }

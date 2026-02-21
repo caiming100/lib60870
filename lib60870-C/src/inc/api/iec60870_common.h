@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2022 Michael Zillgith
+ *  Copyright 2016-2025 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -46,8 +46,8 @@ extern "C" {
 #define IEC_60870_5_104_DEFAULT_TLS_PORT 19998
 
 #define LIB60870_VERSION_MAJOR 2
-#define LIB60870_VERSION_MINOR 3
-#define LIB60870_VERSION_PATCH 6
+#define LIB60870_VERSION_MINOR 4
+#define LIB60870_VERSION_PATCH 0
 
 /**
  * \brief lib60870 version information
@@ -453,6 +453,16 @@ CS101_ASDU_getNumberOfElements(CS101_ASDU self);
  */
 void
 CS101_ASDU_setNumberOfElements(CS101_ASDU self, int numberOfElements);
+
+/**
+ * \brief Get the value of the VSQ (variable structure qualifier) field of the ASDU
+ *
+ * The VSQ field contains the number of information objects in the ASDU and the sequence flag
+ *
+ * \return the VSQ value
+ */
+uint8_t
+CS101_ASDU_getVSQ(CS101_ASDU self);
 
 /**
  * \brief Get the information object with the given index
@@ -867,6 +877,61 @@ BinaryCounterReading_setAdjusted(BinaryCounterReading self, bool value);
 
 void
 BinaryCounterReading_setInvalid(BinaryCounterReading self, bool value);
+
+typedef struct sIPeerConnection* IPeerConnection;
+
+struct sIPeerConnection {
+    bool (*isReady) (IPeerConnection self);
+    bool (*sendASDU) (IPeerConnection self, CS101_ASDU asdu);
+    bool (*sendASDUEx) (IPeerConnection self, CS101_ASDU asdu, bool bypassQueue);
+    bool (*sendACT_CON) (IPeerConnection self, CS101_ASDU asdu, bool negative);
+    bool (*sendACT_TERM) (IPeerConnection self, CS101_ASDU asdu);
+    void (*close) (IPeerConnection self);
+    int (*getPeerAddress) (IPeerConnection self, char* addrBuf, int addrBufSize);
+    CS101_AppLayerParameters (*getApplicationLayerParameters) (IPeerConnection self);
+    void* object;
+};
+
+bool
+IPeerConnection_isReady(IPeerConnection self);
+
+/**
+ * \brief Send an ASDU to the peer
+ *
+ * \param self the peer connection instance
+ * \param asdu the ASDU to be sent
+ *
+ * \return true when the ASDU has been accepted for transmission, false otherwise
+ */
+bool
+IPeerConnection_sendASDU(IPeerConnection self, CS101_ASDU asdu);
+
+/**
+ * \brief Send an ASDU to the peer
+ *
+ * \param self the peer connection instance
+ * \param asdu the ASDU to be sent
+ * \param bypassQueue when true the ASDU will be sent immediately, bypassing any internal send queue
+ *
+ * \return true when the ASDU has been accepted for transmission, false otherwise
+ */
+bool
+IPeerConnection_sendASDUEx(IPeerConnection self, CS101_ASDU asdu, bool bypassQueue);
+
+bool
+IPeerConnection_sendACT_CON(IPeerConnection self, CS101_ASDU asdu, bool negative);
+
+bool
+IPeerConnection_sendACT_TERM(IPeerConnection self, CS101_ASDU asdu);
+
+CS101_AppLayerParameters
+IPeerConnection_getApplicationLayerParameters(IPeerConnection self);
+
+void
+IPeerConnection_close(IPeerConnection self);
+
+int
+IPeerConnection_getPeerAddress(IPeerConnection self, char* addrBuf, int addrBufSize);
 
 /**
  * @}

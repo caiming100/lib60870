@@ -35,6 +35,10 @@
 #include "iec60870_slave.h"
 #include "link_layer_parameters.h"
 
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_auth_60870_5_7.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -99,6 +103,21 @@ CS101_Slave_createEx(SerialPort serialPort, const LinkLayerParameters llParamete
  */
 void
 CS101_Slave_destroy(CS101_Slave self);
+
+#ifdef SEC_AUTH_60870_5_7
+
+/**
+ * \brief Set the secure endpoint for this slave instance
+ * 
+ * This function is used to enable secure authentication according to IEC 60870-5-7
+ * for the slave instance.
+ * 
+ * \param SecureEndpoint the secure endpoint to be used
+ */
+void
+CS101_Slave_setSecureEndpoint(CS101_Slave self, SecureEndpoint secureEndpoint);
+
+#endif /* SEC_AUTH_60870_5_7 */
 
 /**
  * \brief Set the value of the DIR bit when sending messages (only balanced mode)
@@ -345,6 +364,15 @@ CS101_Slave_setASDUHandler(CS101_Slave self, CS101_ASDUHandler handler, void* pa
  */
 void
 CS101_Slave_setRawMessageHandler(CS101_Slave self, IEC60870_RawMessageHandler handler, void* parameter);
+
+/**
+ * \brief Set the handler to get the next ASDU for an interrogation response (used for interrogation response data)
+ *
+ * \param handler the callback handler function
+ * \param parameter user provided parameter to be passed to the callback handler
+ */
+void
+CS101_Slave_setGetNextInterrogationASDUHandler(CS101_Slave self, CS101_GetNextInterrogationASDUHandler handler, void* parameter);
 
 /**
  * @}

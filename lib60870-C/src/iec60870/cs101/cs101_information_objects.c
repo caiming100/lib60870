@@ -3422,6 +3422,146 @@ IntegratedTotalsWithCP56Time2a_getFromBuffer(IntegratedTotalsWithCP56Time2a self
 }
 
 /***********************************************************************
+ * IntegratedTotalsForSecurityStatistics : InformationObject
+ ***********************************************************************/
+
+static bool
+IntegratedTotalsForSecurityStatistics_encode(IntegratedTotalsForSecurityStatistics self, Frame frame, CS101_AppLayerParameters parameters, bool isSequence)
+{
+    int size = isSequence ? 14 : (parameters->sizeOfIOA + 14);
+
+    if (Frame_getSpaceLeft(frame) < size)
+        return false;
+
+    InformationObject_encodeBase((InformationObject) self, frame, parameters, isSequence);
+
+    Frame_setNextByte(frame, (uint8_t) self->aid);
+    Frame_setNextByte(frame, (uint8_t) (self->aid / 0x100));
+
+    Frame_appendBytes(frame, self->totals.encodedValue, 5);
+
+    Frame_appendBytes(frame, self->timestamp.encodedValue, 7);
+
+    return true;
+}
+
+struct sInformationObjectVFT integratedTotalsForSecurityStatisticsVFT = {
+        (EncodeFunction) IntegratedTotalsForSecurityStatistics_encode,
+        (DestroyFunction) IntegratedTotalsForSecurityStatistics_destroy
+};
+
+static void
+IntegratedTotalsForSecurityStatistics_initialize(IntegratedTotalsForSecurityStatistics self)
+{
+    self->virtualFunctionTable = &(integratedTotalsForSecurityStatisticsVFT);
+    self->type = S_IT_TC_1;
+}
+
+void
+IntegratedTotalsForSecurityStatistics_destroy(IntegratedTotalsForSecurityStatistics self)
+{
+    GLOBAL_FREEMEM(self);
+}
+
+IntegratedTotalsForSecurityStatistics
+IntegratedTotalsForSecurityStatistics_create(IntegratedTotalsForSecurityStatistics self, int ioa, uint16_t aid,
+        const BinaryCounterReading value, const CP56Time2a timestamp)
+{
+    if (self == NULL)
+        self = (IntegratedTotalsForSecurityStatistics) GLOBAL_CALLOC(1, sizeof(struct sIntegratedTotalsForSecurityStatistics));
+
+    if (self)
+    {
+        IntegratedTotalsForSecurityStatistics_initialize(self);
+
+        self->objectAddress = ioa;
+        self->aid = aid;
+        self->totals = *value;
+        self->timestamp = *timestamp;
+    }
+
+    return self;
+}
+
+BinaryCounterReading
+IntegratedTotalsForSecurityStatistics_getBCR(IntegratedTotalsForSecurityStatistics self)
+{
+    return &(self->totals);
+}
+
+void
+IntegratedTotalsForSecurityStatistics_setBCR(IntegratedTotalsForSecurityStatistics self, BinaryCounterReading value)
+{
+    int i;
+
+    for (i = 0; i < 5; i++)
+        self->totals.encodedValue[i] = value->encodedValue[i];
+}
+
+CP56Time2a
+IntegratedTotalsForSecurityStatistics_getTimestamp(IntegratedTotalsForSecurityStatistics self)
+{
+    return &(self->timestamp);
+}
+
+void
+IntegratedTotalsForSecurityStatistics_setTimestamp(IntegratedTotalsForSecurityStatistics self,
+        CP56Time2a value)
+{
+    int i;
+    for (i = 0; i < 7; i++) {
+        self->timestamp.encodedValue[i] = value->encodedValue[i];
+    }
+}
+
+IntegratedTotalsForSecurityStatistics
+IntegratedTotalsForSecurityStatistics_getFromBuffer(IntegratedTotalsForSecurityStatistics self, CS101_AppLayerParameters parameters,
+        uint8_t* msg, int msgSize, int startIndex, bool isSequence)
+{
+    /* check message size */
+    int minSize = startIndex + 5;
+
+    if (!isSequence)
+        minSize += parameters->sizeOfIOA;
+
+    if (minSize > msgSize)
+    {
+        DEBUG_PRINT("invalid ASDU - size too small\n");
+        return NULL;
+    }
+
+    if (self == NULL)
+        self = (IntegratedTotalsForSecurityStatistics)GLOBAL_MALLOC(sizeof(struct sIntegratedTotalsForSecurityStatistics));
+
+    if (self)
+    {
+        IntegratedTotalsForSecurityStatistics_initialize(self);
+
+        if (!isSequence)
+        {
+            InformationObject_getFromBuffer((InformationObject) self, parameters, msg, startIndex);
+
+            startIndex += parameters->sizeOfIOA; /* skip IOA */
+        }
+
+        /* AID */
+        self->aid = msg [startIndex++];
+        self->aid += (msg [startIndex++] * 0x100);
+
+        /* BCR */
+        int i = 0;
+
+        for (i = 0; i < 5; i++)
+            self->totals.encodedValue[i] = msg [startIndex++];
+
+        /* timestamp */
+        CP56Time2a_getFromBuffer(&(self->timestamp), msg, msgSize, startIndex);
+    }
+
+    return self;
+}
+
+/***********************************************************************
  * EventOfProtectionEquipment : InformationObject
  ***********************************************************************/
 

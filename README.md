@@ -13,6 +13,7 @@ Features:
 - CS 104 redundancy group support
 - CS101 slave/CS104 server: file service support
 - Supports most TLS features required by IEC 62351-3 (third party code mbedtls required)
+- Support for secure authentication (IEC 60870-5-7:2013) is available as commercially available add-on
 - portable C99 code
 
 Please also consider the User Guide and the API reference documentation (https://support.mz-automation.de/doc/lib60870/latest/)
@@ -105,4 +106,6 @@ Support and commercial license options are provided by MZ Automation GmbH. Pleas
 
 If you want to contribute to the improvement and development of the library please send me comments, feature requests, bug reports, or patches.
 
-For more than trivial contributions I require you to sign a Contributor License Agreement. Please contact info@libiec61850.ccom
+Please do not create pull requests for the github repository. The github repository is a read-only copy. Pull requests may be silently ignored.
+
+For more than trivial contributions I require you to sign a Contributor License Agreement. Please contact info@mz-automation.de

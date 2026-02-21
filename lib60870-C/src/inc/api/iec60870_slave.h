@@ -60,18 +60,7 @@ extern "C" {
 /**
  * \brief Interface to send messages to the master (used by slave)
  */
-typedef struct sIMasterConnection* IMasterConnection;
-
-struct sIMasterConnection {
-    bool (*isReady) (IMasterConnection self);
-    bool (*sendASDU) (IMasterConnection self, CS101_ASDU asdu);
-    bool (*sendACT_CON) (IMasterConnection self, CS101_ASDU asdu, bool negative);
-    bool (*sendACT_TERM) (IMasterConnection self, CS101_ASDU asdu);
-    void (*close) (IMasterConnection self);
-    int (*getPeerAddress) (IMasterConnection self, char* addrBuf, int addrBufSize);
-    CS101_AppLayerParameters (*getApplicationLayerParameters) (IMasterConnection self);
-    void* object;
-};
+typedef struct sIPeerConnection* IMasterConnection;
 
 /*
  * \brief Check if the connection is ready to send an ASDU.
@@ -101,6 +90,20 @@ IMasterConnection_isReady(IMasterConnection self);
  */
 bool
 IMasterConnection_sendASDU(IMasterConnection self, CS101_ASDU asdu);
+
+/**
+ * \brief Send an ASDU to the client/master
+ *
+ * NOTE: ASDU instance has to be released by the caller!
+ *
+ * \param self the connection object (this is usually received as a parameter of a callback function)
+ * \param asdu the ASDU to send to the client/master
+ * \param bypassQueue if true, the ASDU is sent immediately bypassing any queue
+ *
+ * \return true when the ASDU has been sent or queued for transmission, false otherwise
+ */
+bool
+IMasterConnection_sendASDUEx(IMasterConnection self, CS101_ASDU asdu, bool bypassQueue);
 
 /**
  * \brief Send an ACT_CON ASDU to the client/master
@@ -175,10 +178,34 @@ typedef enum
  */
 typedef struct sCS101_SlavePlugin* CS101_SlavePlugin;
 
+typedef void (*CS101_PluginEnqueueFunc)(void* ctx, CS101_ASDU asdu);
+
+typedef void (*CS101_PluginForwardAsduFunc)(CS101_SlavePlugin plugin, void* ctx, CS101_ASDU asdu, void* connection);
+
 struct sCS101_SlavePlugin
 {
     CS101_SlavePlugin_Result (*handleAsdu) (void* parameter, IMasterConnection connection, CS101_ASDU asdu);
+    CS101_SlavePlugin_Result (*sendAsdu) (void* parameter, IMasterConnection connection, CS101_ASDU asdu);
+
+    //TODO check if function is required -> could be required to send security statistics (to all clients)
+    void (*setEnqueueFunction) (void* parameter, CS101_PluginEnqueueFunc func, void* ctx);
+
+    bool (*hasAsduToSend) (void* parameter);
+    Frame (*getNextAsduToSend) (void* parameter, Frame frame);
+
+    /**
+     * \brief Set the function to forward an ASDU from the plugin to the lib60870 slave instance
+     * 
+     * \param parameter user provided parameter
+     * \param func the function to forward an ASDU to lib60870 slave instance
+     * \param ctx context parameter that has to be passed to the function when called
+     */
+    void (*setForwardAsduFunction) (void* parameter, CS101_PluginForwardAsduFunc func, void* ctx);
+
     void (*runTask) (void* parameter, IMasterConnection connection);
+    void (*eventHandler)(void* parameter, IPeerConnection connection, int event); /* only be called when CS104 is used */
+
+    bool (*checkIfAsduAllowed) (void* parameter);
 
     void* parameter;
 };
@@ -246,6 +273,21 @@ typedef bool (*CS101_DelayAcquisitionHandler) (void* parameter, IMasterConnectio
  * \brief Handler for ASDUs that are not handled by other handlers (default handler)
  */
 typedef bool (*CS101_ASDUHandler) (void* parameter, IMasterConnection connection, CS101_ASDU asdu);
+
+/**
+ * \brief Callback handler to get the next ASDU for an interrogation response (used for GI responses)
+ *
+ * NOTE: This handler will be called when the slave is ready to transmit the next ASDU for the interrogation response.
+ * In unbalanced mode, this callback is called when the slave receives a REQ UD 2 message from the master.
+ * The returned ASDU will bypass the class 2 queue.
+ * The handler should return the next ASDU to send, or NULL if no more ASDU is available to send.
+ *
+ * \param parameter user provided parameter
+ * \param connection represents the (TCP) connection that received the interrogation command
+ *
+ * \return the next ASDU to send in response to the interrogation command, or NULL if no data is available to send
+ */
+typedef CS101_ASDU (*CS101_GetNextInterrogationASDUHandler) (void* parameter, IMasterConnection connection);
 
 /**
  * \brief Handler that allows the application to inform the slave library if a specific CA is allowed/available

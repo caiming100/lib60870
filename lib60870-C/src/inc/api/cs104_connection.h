@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2022 Michael Zillgith
+ *  Copyright 2016-2025 Michael Zillgith
  *
  *  This file is part of lib60870-C
  *
@@ -27,6 +27,10 @@
 
 #include "tls_config.h"
 #include "iec60870_master.h"
+
+#ifdef SEC_AUTH_60870_5_7
+#include "sec_auth_60870_5_7.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,6 +78,25 @@ CS104_Connection_create(const char* hostname, int tcpPort);
 CS104_Connection
 CS104_Connection_createSecure(const char* hostname, int tcpPort, TLSConfiguration tlsConfig);
 
+/**
+ * \brief Add a plugin to extend the master functionality
+ * 
+ * \param plugin the plugin to add
+ */
+void
+CS104_Connection_addPlugin(CS104_Connection self, CS101_MasterPlugin plugin);
+
+#ifdef SEC_AUTH_60870_5_7
+
+/**
+ * \brief Set a SecureEndpoint instance for this connection to enable secure authentication
+ *
+ * \param secureEndpoint the SecureEndpoint instance
+ */
+void
+CS104_Connection_setSecureEndpoint(CS104_Connection self, SecureEndpoint secureEndpoint);
+
+#endif /* SEC_AUTH_60870_5_7 */
 
 /**
  * \brief Set the local IP address and port to be used by the client
@@ -132,6 +155,17 @@ CS101_AppLayerParameters
 CS104_Connection_getAppLayerParameters(CS104_Connection self);
 
 /**
+ * \brief Convenience function to set the originator address in the application layer parameters
+ *
+ * \note This function can be called multiple times to change the originator address while the connection is running.
+ *
+ * \param self CS104_Connection instance
+ * \param originatorAddress the originator address to set (0-255)
+ */
+void
+CS104_Connection_setOriginatorAddress(CS104_Connection self, uint8_t originatorAddress);
+
+/**
  * \brief Sets the timeout for connecting to the server (in ms)
  * 
  * \deprecated Function has no effect! Set T0 parameter instead.
@@ -163,6 +197,15 @@ CS104_Connection_connectAsync(CS104_Connection self);
  */
 bool
 CS104_Connection_connect(CS104_Connection self);
+
+/**
+ * \brief Check if the connection object is currently connected to a slave/server
+ *
+ * \param self CS104_Connection instance
+ * \return true if connected, false otherwise
+ */
+bool
+CS104_Connection_isConnected(CS104_Connection self);
 
 /**
  * \brief start data transmission on this connection
@@ -267,7 +310,7 @@ CS104_Connection_sendTestCommandWithTimestamp(CS104_Connection self, int ca, uin
  *
  * \deprecated Use \ref CS104_Connection_sendProcessCommandEx instead
  *
- * \param typeId the type ID of the command message to send or 0 to use the type ID of the information object
+ * \param typeId this parameter is ignored
  * \param cot the cause of transmission (should be ACTIVATION to select/execute or ACT_TERM to cancel the command)
  * \param ca the common address of the information object
  * \param command the command information object (e.g. SingleCommand or DoubleCommand)
@@ -360,6 +403,45 @@ CS104_Connection_close(CS104_Connection self);
  */
 void
 CS104_Connection_destroy(CS104_Connection self);
+
+/**
+ * \brief Start the connection in threadless mode (no internal handling thread)
+ *
+ * Establishes the TCP (and optional TLS) connection and prepares internal state.
+ * The application must then periodically call \ref CS104_Connection_run to
+ * drive receive, timeout, plugin, and security tasks.
+ *
+ * \return true when connection successfully established and ready, false otherwise
+ */
+bool
+CS104_Connection_startThreadless(CS104_Connection self);
+
+/**
+ * \brief Stop a connection started in threadless mode and release socket/TLS resources
+ */
+void
+CS104_Connection_stopThreadless(CS104_Connection self);
+
+/**
+ * \brief Check if the connection is operating in threadless mode
+ *
+ * \return true when in threadless mode, false otherwise
+ */
+bool
+CS104_Connection_isThreadless(CS104_Connection self);
+
+/**
+ * \brief Execute one iteration of connection handling in threadless mode
+ *
+ * Waits up to timeoutMs for socket readiness, processes incoming/outgoing frames,
+ * handles protocol timeouts (T1/T2/T3), optional security endpoint, and plugin tasks.
+ *
+ * \param timeoutMs maximum time in milliseconds to wait for socket readiness (<=0 -> no wait)
+ *
+ * \return true while the connection remains active, false if connection closed or failed
+ */
+bool
+CS104_Connection_run(CS104_Connection self, int timeoutMs);
 
 /*! @} */
 

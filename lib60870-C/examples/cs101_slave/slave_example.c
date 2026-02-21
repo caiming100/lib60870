@@ -66,84 +66,165 @@ clockSyncHandler(void* parameter, IMasterConnection connection, CS101_ASDU asdu,
     return true;
 }
 
+static Semaphore gi_stateLock = NULL;
+static int gi_state = 0; /* 0 = IDLE, 1 = IN_PROGRESS */
+static IMasterConnection gi_connection = NULL;
+static int gi_progress = 0;
+static sCS101_StaticASDU gi_asdu;
+static uint8_t gi_oa = 0;
+
+static CS101_ASDU
+getNextInterrogationASDUHandler(void* parameter, IMasterConnection connection)
+{
+    CS101_ASDU retVal = NULL;
+
+    Semaphore_wait(gi_stateLock);
+
+    if (gi_state == 1)
+    {
+        CS101_AppLayerParameters alParams = IMasterConnection_getApplicationLayerParameters(connection);
+
+        if (gi_progress == 0)
+        {
+            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&gi_asdu, alParams, false, CS101_COT_INTERROGATED_BY_STATION,
+                    gi_oa, 1, false, false);
+
+            InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 100, -1, IEC60870_QUALITY_GOOD);
+
+            CS101_ASDU_addInformationObject(newAsdu, io);
+
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
+                MeasuredValueScaled_create((MeasuredValueScaled) io, 101, 23, IEC60870_QUALITY_GOOD));
+
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
+                MeasuredValueScaled_create((MeasuredValueScaled) io, 102, 2300, IEC60870_QUALITY_GOOD));
+
+            InformationObject_destroy(io);
+
+            gi_progress++;
+
+            retVal = (CS101_ASDU)&gi_asdu;
+        }
+        else if (gi_progress == 1)
+        {
+            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&gi_asdu, alParams, false, CS101_COT_INTERROGATED_BY_STATION,
+                        gi_oa, 1, false, false);
+
+            InformationObject io = (InformationObject) SinglePointInformation_create(NULL, 104, true, IEC60870_QUALITY_GOOD);
+
+            CS101_ASDU_addInformationObject(newAsdu, io);
+
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
+                SinglePointInformation_create((SinglePointInformation) io, 105, false, IEC60870_QUALITY_GOOD));
+
+            InformationObject_destroy(io);
+
+            gi_progress++;
+
+            retVal = (CS101_ASDU)&gi_asdu;
+        }
+        else if (gi_progress == 2)
+        {
+            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&gi_asdu, alParams, true, CS101_COT_INTERROGATED_BY_STATION,
+                gi_oa, 1, false, false);
+
+            InformationObject io = NULL;
+
+            CS101_ASDU_addInformationObject(newAsdu, io = (InformationObject) SinglePointInformation_create(NULL, 300, true, IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 301, false, IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 302, true, IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 303, false, IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 304, true, IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 305, false, IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 306, true, IEC60870_QUALITY_GOOD));
+            CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 307, false, IEC60870_QUALITY_GOOD));
+
+            InformationObject_destroy(io);
+
+            gi_progress++;
+
+            retVal = (CS101_ASDU)&gi_asdu;
+        }
+        else if (gi_progress == 3)
+        {
+            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&gi_asdu, alParams, true, CS101_COT_INTERROGATED_BY_STATION,
+                gi_oa, 1, false, false);
+
+            InformationObject io = (InformationObject) BitString32_create(NULL, 500, 0xaaaa);
+
+            CS101_ASDU_addInformationObject(newAsdu, io);
+
+            InformationObject_destroy(io);
+
+            gi_progress++;
+
+            retVal = (CS101_ASDU)&gi_asdu;
+        }
+        else if (gi_progress == 4)
+        {
+            /* send ACT_TERM */
+            CS101_ASDU newAsdu = CS101_ASDU_initializeStatic(&gi_asdu, alParams, false, CS101_COT_ACTIVATION_TERMINATION,
+                            gi_oa, 1, false, false);
+
+            InformationObject io = (InformationObject) InterrogationCommand_create(NULL, 0, 20);
+
+            CS101_ASDU_addInformationObject(newAsdu, io);
+
+            InformationObject_destroy(io);
+
+            /* this one we do not return but use the sendASDU function to put it into the class 1 queue */
+            IMasterConnection_sendASDU(connection, newAsdu);
+
+            /* finished */
+            gi_state = 0;
+            gi_connection = NULL;
+            gi_progress = 0;
+        }
+    }
+
+    Semaphore_post(gi_stateLock);
+
+    return retVal;
+}
+
 /* Callback handler that is called when an interrogation command is received */
 static bool
 interrogationHandler(void* parameter, IMasterConnection connection, CS101_ASDU asdu, uint8_t qoi)
 {
     printf("Received interrogation for group %i\n", qoi);
 
-    if (qoi == 20)
-    { /* only handle station interrogation */
+    int ca = CS101_ASDU_getCA(asdu);
 
-        CS101_AppLayerParameters alParams = IMasterConnection_getApplicationLayerParameters(connection);
+    if (ca == 1) /* only handle interrogation for CA(SDU) 1 */
+    {
+        if (qoi == 20) /* only handle station interrogation */
+        {
+            Semaphore_wait(gi_stateLock);
 
-        IMasterConnection_sendACT_CON(connection, asdu, false);
+            gi_state = 1;
+            gi_connection = connection;
+            gi_progress = 0;
+            gi_oa = (uint8_t)CS101_ASDU_getOA(asdu);
 
-        /* The CS101 specification only allows information objects without timestamp in GI responses */
+            /* this will put the ACT-CON ASDU into the class 1 queue */
+            IMasterConnection_sendACT_CON(connection, asdu, false);
 
-        CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_INTERROGATED_BY_STATION, 0, 1, false, false);
+            /* the remaining GI data has to be sent as class 2 data in the getNextInterrogationASDUHandler callback */
+            /* the final ACT-TERM message has to sent as class 1 data when the GI process is finished */
 
-        InformationObject io = (InformationObject)MeasuredValueScaled_create(NULL, 100, -1, IEC60870_QUALITY_GOOD);
-
-        CS101_ASDU_addInformationObject(newAsdu, io);
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)MeasuredValueScaled_create(
-                                                     (MeasuredValueScaled)io, 101, 23, IEC60870_QUALITY_GOOD));
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)MeasuredValueScaled_create(
-                                                     (MeasuredValueScaled)io, 102, 2300, IEC60870_QUALITY_GOOD));
-
-        InformationObject_destroy(io);
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        CS101_ASDU_destroy(newAsdu);
-
-        newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_INTERROGATED_BY_STATION, 0, 1, false, false);
-
-        io = (InformationObject)SinglePointInformation_create(NULL, 104, true, IEC60870_QUALITY_GOOD);
-
-        CS101_ASDU_addInformationObject(newAsdu, io);
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)SinglePointInformation_create(
-                                                     (SinglePointInformation)io, 105, false, IEC60870_QUALITY_GOOD));
-
-        InformationObject_destroy(io);
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        CS101_ASDU_destroy(newAsdu);
-
-        newAsdu = CS101_ASDU_create(alParams, true, CS101_COT_INTERROGATED_BY_STATION, 0, 1, false, false);
-
-        CS101_ASDU_addInformationObject(
-            newAsdu, io = (InformationObject)SinglePointInformation_create(NULL, 300, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)SinglePointInformation_create(
-                                                     (SinglePointInformation)io, 301, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)SinglePointInformation_create(
-                                                     (SinglePointInformation)io, 302, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)SinglePointInformation_create(
-                                                     (SinglePointInformation)io, 303, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)SinglePointInformation_create(
-                                                     (SinglePointInformation)io, 304, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)SinglePointInformation_create(
-                                                     (SinglePointInformation)io, 305, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)SinglePointInformation_create(
-                                                     (SinglePointInformation)io, 306, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)SinglePointInformation_create(
-                                                     (SinglePointInformation)io, 307, false, IEC60870_QUALITY_GOOD));
-
-        InformationObject_destroy(io);
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        CS101_ASDU_destroy(newAsdu);
-
-        IMasterConnection_sendACT_TERM(connection, asdu);
+            Semaphore_post(gi_stateLock);
+        }
+        else
+        {
+            IMasterConnection_sendACT_CON(connection, asdu, true);
+        }
     }
     else
     {
-        IMasterConnection_sendACT_CON(connection, asdu, true);
+        /* send error response */
+        CS101_ASDU_setCOT(asdu, CS101_COT_UNKNOWN_CA);
+        CS101_ASDU_setNegative(asdu, true);
+        IMasterConnection_sendASDU(connection, asdu);
     }
 
     return true;
@@ -236,8 +317,16 @@ main(int argc, char** argv)
 
     SerialPort port = SerialPort_create(serialPort, 9600, 8, 'E', 1);
 
+    if (!port)
+    {
+        fprintf(stderr, "Failed to create serial port\n");
+        return 1;
+    }
+
+    gi_stateLock = Semaphore_create(1);
+
     /* create a new slave/server instance with default link layer and application layer parameters */
-    // CS101_Slave slave = CS101_Slave_create(port, NULL, NULL, IEC60870_LINK_LAYER_BALANCED);
+    //CS101_Slave slave = CS101_Slave_create(port, NULL, NULL, IEC60870_LINK_LAYER_BALANCED);
     CS101_Slave slave = CS101_Slave_create(port, NULL, NULL, IEC60870_LINK_LAYER_UNBALANCED);
 
     CS101_Slave_setLinkLayerAddress(slave, 1);
@@ -267,6 +356,8 @@ main(int argc, char** argv)
     /* set handler for reset CU (reset communication unit) message */
     CS101_Slave_setResetCUHandler(slave, resetCUHandler, (void*)slave);
 
+    CS101_Slave_setGetNextInterrogationASDUHandler(slave, getNextInterrogationASDUHandler, slave);
+
     /* set timeout for detecting connection loss */
     CS101_Slave_setIdleTimeout(slave, 1500);
 
@@ -280,7 +371,11 @@ main(int argc, char** argv)
 
     uint64_t lastMessageSent = 0;
 
-    SerialPort_open(port);
+    if (!SerialPort_open(port))
+    {
+        fprintf(stderr, "Failed to open serial port\n");
+        return 1;
+    }
 
     while (running)
     {
@@ -318,4 +413,8 @@ exit_program:
 
     SerialPort_close(port);
     SerialPort_destroy(port);
+
+    Semaphore_destroy(gi_stateLock);
+
+    return 0;
 }

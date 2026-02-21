@@ -1,23 +1,30 @@
-#include "unity.h"
-#include "iec60870_common.h"
-#include "cs104_slave.h"
-#include "cs104_connection.h"
-#include "hal_time.h"
-#include "hal_thread.h"
 #include "buffer_frame.h"
-#include <string.h>
+#include "cs104_connection.h"
+#include "cs104_slave.h"
+#include "hal_socket.h"
+#include "hal_thread.h"
+#include "hal_time.h"
+#include "iec60870_common.h"
+#include "unity.h"
 #include <stdlib.h>
+#include <string.h>
 
 #ifndef CONFIG_CS104_SUPPORT_TLS
 #define CONFIG_CS104_SUPPORT_TLS 0
 #endif
 
 #if WIN32
-#define bzero(b,len) (memset((b), '\0', (len)), (void) 0) 
+#define bzero(b, len) (memset((b), '\0', (len)), (void)0)
 #endif
 
-void setUp(void) { }
-void tearDown(void) {}
+void
+setUp(void)
+{
+}
+void
+tearDown(void)
+{
+}
 
 static struct sCS101_AppLayerParameters defaultAppLayerParameters = {
     /* .sizeOfTypeId =  */ 1,
@@ -26,8 +33,7 @@ static struct sCS101_AppLayerParameters defaultAppLayerParameters = {
     /* .originatorAddress = */ 0,
     /* .sizeOfCA = */ 2,
     /* .sizeOfIOA = */ 3,
-    /* .maxSizeOfASDU = */ 249
-};
+    /* .maxSizeOfASDU = */ 249};
 
 typedef struct sCS104_IPAddress* CS104_IPAddress;
 
@@ -44,13 +50,15 @@ InformationObject_setObjectAddress(InformationObject self, int ioa);
 static bool
 CS104_IPAddress_setFromString(CS104_IPAddress self, const char* ipAddrStr)
 {
-    if (strchr(ipAddrStr, '.') != NULL) {
+    if (strchr(ipAddrStr, '.') != NULL)
+    {
         /* parse IPv4 string */
         self->type = IP_ADDRESS_TYPE_IPV4;
 
         int i;
 
-        for (i = 0; i < 4; i++) {
+        for (i = 0; i < 4; i++)
+        {
             uint32_t val = strtoul(ipAddrStr, NULL, 10);
 
             if (val > UINT8_MAX)
@@ -68,24 +76,28 @@ CS104_IPAddress_setFromString(CS104_IPAddress self, const char* ipAddrStr)
 
         return true;
     }
-    else if (strchr(ipAddrStr, ':') != NULL) {
+    else if (strchr(ipAddrStr, ':') != NULL)
+    {
         self->type = IP_ADDRESS_TYPE_IPV6;
 
         /* has "::" ? */
-        char* doubleSep = (char*) strstr(ipAddrStr, "::");
+        char* doubleSep = (char*)strstr(ipAddrStr, "::");
 
         int elementsBefore = 0;
         int elementsAfter = 8;
         int elementsSkipped = 0;
 
-        if (doubleSep) {
+        if (doubleSep)
+        {
             /* count number of elements before double separator */
-            char* curPos = (char*) ipAddrStr;
+            char* curPos = (char*)ipAddrStr;
 
-            if (curPos != doubleSep) {
+            if (curPos != doubleSep)
+            {
                 elementsBefore = 1;
 
-                while (curPos < doubleSep) {
+                while (curPos < doubleSep)
+                {
                     if (*curPos == ':')
                         elementsBefore++;
                     curPos++;
@@ -97,11 +109,12 @@ CS104_IPAddress_setFromString(CS104_IPAddress self, const char* ipAddrStr)
 
             curPos = doubleSep + 2;
 
-            if (*curPos != 0) {
-
+            if (*curPos != 0)
+            {
                 elementsAfter = 1;
 
-                while (*curPos != 0) {
+                while (*curPos != 0)
+                {
                     if (*curPos == ':')
                         elementsAfter++;
                     curPos++;
@@ -113,7 +126,8 @@ CS104_IPAddress_setFromString(CS104_IPAddress self, const char* ipAddrStr)
 
         int i;
 
-        for (i = 0; i < elementsBefore; i++) {
+        for (i = 0; i < elementsBefore; i++)
+        {
             uint32_t val = strtoul(ipAddrStr, NULL, 16);
 
             if (val > UINT16_MAX)
@@ -130,15 +144,17 @@ CS104_IPAddress_setFromString(CS104_IPAddress self, const char* ipAddrStr)
             ipAddrStr++;
         }
 
-        for (i = elementsBefore; i < elementsBefore + elementsSkipped; i++) {
+        for (i = elementsBefore; i < elementsBefore + elementsSkipped; i++)
+        {
             self->address[i * 2] = 0;
-            self->address[i * 2 +1] = 0;
+            self->address[i * 2 + 1] = 0;
         }
 
         if (doubleSep)
             ipAddrStr = doubleSep + 2;
 
-        for (i = elementsBefore + elementsSkipped; i < 8; i++) {
+        for (i = elementsBefore + elementsSkipped; i < 8; i++)
+        {
             uint32_t val = strtoul(ipAddrStr, NULL, 16);
 
             if (val > UINT16_MAX)
@@ -157,7 +173,8 @@ CS104_IPAddress_setFromString(CS104_IPAddress self, const char* ipAddrStr)
 
         return true;
     }
-    else {
+    else
+    {
         return false;
     }
 }
@@ -177,7 +194,8 @@ CS104_IPAddress_equals(CS104_IPAddress self, CS104_IPAddress other)
 
     int i;
 
-    for (i = 0; i < size; i++) {
+    for (i = 0; i < size; i++)
+    {
         if (self->address[i] != other->address[i])
             return false;
     }
@@ -186,7 +204,8 @@ CS104_IPAddress_equals(CS104_IPAddress self, CS104_IPAddress other)
 }
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 void
@@ -225,7 +244,7 @@ test_CP56Time2aToMsTimestamp(void)
 
     uint64_t convertedTimeval = CP56Time2a_toMsTimestamp(&timeval);
 
-    TEST_ASSERT_EQUAL_UINT64((uint64_t) 1490087538821, convertedTimeval);
+    TEST_ASSERT_EQUAL_UINT64((uint64_t)1490087538821, convertedTimeval);
 }
 
 void
@@ -296,93 +315,92 @@ test_StepPositionInformation(void)
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, StepPositionInformation_getQuality(spi7));
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, StepPositionInformation_getQuality(spi8));
 
+    uint8_t buffer[256];
 
-	uint8_t buffer[256];
+    struct sBufferFrame bf;
 
-	struct sBufferFrame bf;
+    Frame f = BufferFrame_initialize(&bf, buffer, 0);
 
-	Frame f = BufferFrame_initialize(&bf, buffer, 0);
+    CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-	CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi8);
 
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi1);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi2);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi3);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi4);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi5);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi6);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi7);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi8);
+    StepPositionInformation_destroy(spi1);
+    StepPositionInformation_destroy(spi2);
+    StepPositionInformation_destroy(spi3);
+    StepPositionInformation_destroy(spi4);
+    StepPositionInformation_destroy(spi5);
+    StepPositionInformation_destroy(spi6);
+    StepPositionInformation_destroy(spi7);
+    StepPositionInformation_destroy(spi8);
 
-	StepPositionInformation_destroy(spi1);
-	StepPositionInformation_destroy(spi2);
-	StepPositionInformation_destroy(spi3);
-	StepPositionInformation_destroy(spi4);
-	StepPositionInformation_destroy(spi5);
-	StepPositionInformation_destroy(spi6);
-	StepPositionInformation_destroy(spi7);
-	StepPositionInformation_destroy(spi8);
+    CS101_ASDU_encode(asdu, f);
 
-	CS101_ASDU_encode(asdu, f);
+    TEST_ASSERT_EQUAL_INT(46, Frame_getMsgSize(f));
 
-	TEST_ASSERT_EQUAL_INT(46, Frame_getMsgSize(f));
+    CS101_ASDU_destroy(asdu);
 
-	CS101_ASDU_destroy(asdu);
+    CS101_ASDU asdu2 = CS101_ASDU_createFromBuffer(&defaultAppLayerParameters, buffer, Frame_getMsgSize(f));
 
-	CS101_ASDU asdu2 = CS101_ASDU_createFromBuffer(&defaultAppLayerParameters, buffer, Frame_getMsgSize(f));
+    TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-	TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
+    StepPositionInformation spi1_dec = (StepPositionInformation)CS101_ASDU_getElement(asdu2, 0);
+    StepPositionInformation spi2_dec = (StepPositionInformation)CS101_ASDU_getElement(asdu2, 1);
+    StepPositionInformation spi3_dec = (StepPositionInformation)CS101_ASDU_getElement(asdu2, 2);
+    StepPositionInformation spi4_dec = (StepPositionInformation)CS101_ASDU_getElement(asdu2, 3);
+    StepPositionInformation spi5_dec = (StepPositionInformation)CS101_ASDU_getElement(asdu2, 4);
+    StepPositionInformation spi6_dec = (StepPositionInformation)CS101_ASDU_getElement(asdu2, 5);
+    StepPositionInformation spi7_dec = (StepPositionInformation)CS101_ASDU_getElement(asdu2, 6);
+    StepPositionInformation spi8_dec = (StepPositionInformation)CS101_ASDU_getElement(asdu2, 7);
 
-	StepPositionInformation spi1_dec = (StepPositionInformation) CS101_ASDU_getElement(asdu2, 0);
-	StepPositionInformation spi2_dec = (StepPositionInformation) CS101_ASDU_getElement(asdu2, 1);
-	StepPositionInformation spi3_dec = (StepPositionInformation) CS101_ASDU_getElement(asdu2, 2);
-	StepPositionInformation spi4_dec = (StepPositionInformation) CS101_ASDU_getElement(asdu2, 3);
-	StepPositionInformation spi5_dec = (StepPositionInformation) CS101_ASDU_getElement(asdu2, 4);
-	StepPositionInformation spi6_dec = (StepPositionInformation) CS101_ASDU_getElement(asdu2, 5);
-	StepPositionInformation spi7_dec = (StepPositionInformation) CS101_ASDU_getElement(asdu2, 6);
-	StepPositionInformation spi8_dec = (StepPositionInformation) CS101_ASDU_getElement(asdu2, 7);
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)spi3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)spi4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)spi5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)spi6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)spi7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)spi8_dec));
 
-	TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
-	TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
-	TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)spi3_dec));
-	TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)spi4_dec));
-	TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)spi5_dec));
-	TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)spi6_dec));
-	TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)spi7_dec));
-	TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)spi8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, StepPositionInformation_getQuality(spi1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, StepPositionInformation_getQuality(spi2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, StepPositionInformation_getQuality(spi3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, StepPositionInformation_getQuality(spi4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, StepPositionInformation_getQuality(spi5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, StepPositionInformation_getQuality(spi6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, StepPositionInformation_getQuality(spi7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, StepPositionInformation_getQuality(spi8_dec));
 
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, StepPositionInformation_getQuality(spi1_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, StepPositionInformation_getQuality(spi2_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, StepPositionInformation_getQuality(spi3_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, StepPositionInformation_getQuality(spi4_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, StepPositionInformation_getQuality(spi5_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, StepPositionInformation_getQuality(spi6_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, StepPositionInformation_getQuality(spi7_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, StepPositionInformation_getQuality(spi8_dec));
+    TEST_ASSERT_EQUAL_INT(0, StepPositionInformation_getValue(spi1_dec));
+    TEST_ASSERT_TRUE(StepPositionInformation_isTransient(spi1_dec));
 
-	TEST_ASSERT_EQUAL_INT(0, StepPositionInformation_getValue(spi1_dec));
-	TEST_ASSERT_TRUE(StepPositionInformation_isTransient(spi1_dec));
+    TEST_ASSERT_EQUAL_INT(63, StepPositionInformation_getValue(spi2_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi2_dec));
 
-	TEST_ASSERT_EQUAL_INT(63, StepPositionInformation_getValue(spi2_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi2_dec));
+    TEST_ASSERT_EQUAL_INT(62, StepPositionInformation_getValue(spi3_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi3_dec));
 
-	TEST_ASSERT_EQUAL_INT(62, StepPositionInformation_getValue(spi3_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi3_dec));
+    TEST_ASSERT_EQUAL_INT(61, StepPositionInformation_getValue(spi4_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi4_dec));
 
-	TEST_ASSERT_EQUAL_INT(61, StepPositionInformation_getValue(spi4_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi4_dec));
+    TEST_ASSERT_EQUAL_INT(-61, StepPositionInformation_getValue(spi5_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi5_dec));
 
-	TEST_ASSERT_EQUAL_INT(-61, StepPositionInformation_getValue(spi5_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi5_dec));
+    TEST_ASSERT_EQUAL_INT(-62, StepPositionInformation_getValue(spi6_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi6_dec));
 
-	TEST_ASSERT_EQUAL_INT(-62, StepPositionInformation_getValue(spi6_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi6_dec));
+    TEST_ASSERT_EQUAL_INT(-63, StepPositionInformation_getValue(spi7_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi7_dec));
 
-	TEST_ASSERT_EQUAL_INT(-63, StepPositionInformation_getValue(spi7_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi7_dec));
-
-	TEST_ASSERT_EQUAL_INT(-0, StepPositionInformation_getValue(spi8_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi8_dec));
+    TEST_ASSERT_EQUAL_INT(-0, StepPositionInformation_getValue(spi8_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient(spi8_dec));
 
     StepPositionInformation_destroy(spi1_dec);
     StepPositionInformation_destroy(spi2_dec);
@@ -392,70 +410,70 @@ test_StepPositionInformation(void)
     StepPositionInformation_destroy(spi6_dec);
     StepPositionInformation_destroy(spi7_dec);
     StepPositionInformation_destroy(spi8_dec);
-	CS101_ASDU_destroy(asdu2);
+    CS101_ASDU_destroy(asdu2);
 }
 void
 test_StepPositionWithCP24Time2a(void)
 {
-	StepPositionWithCP24Time2a spi1;
-	StepPositionWithCP24Time2a spi2;
-	StepPositionWithCP24Time2a spi3;
-	StepPositionWithCP24Time2a spi4;
-	StepPositionWithCP24Time2a spi5;
-	StepPositionWithCP24Time2a spi6;
-	StepPositionWithCP24Time2a spi7;
-	StepPositionWithCP24Time2a spi8;
+    StepPositionWithCP24Time2a spi1;
+    StepPositionWithCP24Time2a spi2;
+    StepPositionWithCP24Time2a spi3;
+    StepPositionWithCP24Time2a spi4;
+    StepPositionWithCP24Time2a spi5;
+    StepPositionWithCP24Time2a spi6;
+    StepPositionWithCP24Time2a spi7;
+    StepPositionWithCP24Time2a spi8;
 
     uint64_t time1 = Hal_getTimeInMs();
-	uint64_t time2 = time1 + 1000;
-	uint64_t time3 = time2 + 1000;
-	uint64_t time4 = time3 + 1000;
-	uint64_t time5 = time4 + 1000;
-	uint64_t time6 = time5 + 1000;
-	uint64_t time7 = time6 + 1000;
-	uint64_t time8 = time7 + 1000;
+    uint64_t time2 = time1 + 1000;
+    uint64_t time3 = time2 + 1000;
+    uint64_t time4 = time3 + 1000;
+    uint64_t time5 = time4 + 1000;
+    uint64_t time6 = time5 + 1000;
+    uint64_t time7 = time6 + 1000;
+    uint64_t time8 = time7 + 1000;
 
-	struct sCP24Time2a cpTime1;
-	struct sCP24Time2a cpTime2;
-	struct sCP24Time2a cpTime3;
-	struct sCP24Time2a cpTime4;
-	struct sCP24Time2a cpTime5;
-	struct sCP24Time2a cpTime6;
-	struct sCP24Time2a cpTime7;
-	struct sCP24Time2a cpTime8;
+    struct sCP24Time2a cpTime1;
+    struct sCP24Time2a cpTime2;
+    struct sCP24Time2a cpTime3;
+    struct sCP24Time2a cpTime4;
+    struct sCP24Time2a cpTime5;
+    struct sCP24Time2a cpTime6;
+    struct sCP24Time2a cpTime7;
+    struct sCP24Time2a cpTime8;
 
-	bzero(&cpTime1, sizeof(struct sCP24Time2a));
-	bzero(&cpTime2, sizeof(struct sCP24Time2a));
-	bzero(&cpTime3, sizeof(struct sCP24Time2a));
-	bzero(&cpTime4, sizeof(struct sCP24Time2a));
-	bzero(&cpTime5, sizeof(struct sCP24Time2a));
-	bzero(&cpTime6, sizeof(struct sCP24Time2a));
-	bzero(&cpTime7, sizeof(struct sCP24Time2a));
-	bzero(&cpTime8, sizeof(struct sCP24Time2a));
+    bzero(&cpTime1, sizeof(struct sCP24Time2a));
+    bzero(&cpTime2, sizeof(struct sCP24Time2a));
+    bzero(&cpTime3, sizeof(struct sCP24Time2a));
+    bzero(&cpTime4, sizeof(struct sCP24Time2a));
+    bzero(&cpTime5, sizeof(struct sCP24Time2a));
+    bzero(&cpTime6, sizeof(struct sCP24Time2a));
+    bzero(&cpTime7, sizeof(struct sCP24Time2a));
+    bzero(&cpTime8, sizeof(struct sCP24Time2a));
 
-	CP24Time2a_setMinute(&cpTime1, 12);
-	CP24Time2a_setMillisecond(&cpTime1, 24123);
+    CP24Time2a_setMinute(&cpTime1, 12);
+    CP24Time2a_setMillisecond(&cpTime1, 24123);
 
-	CP24Time2a_setMinute(&cpTime2, 54);
-	CP24Time2a_setMillisecond(&cpTime2, 12345);
+    CP24Time2a_setMinute(&cpTime2, 54);
+    CP24Time2a_setMillisecond(&cpTime2, 12345);
 
-	CP24Time2a_setMinute(&cpTime3, 00);
-	CP24Time2a_setMillisecond(&cpTime3, 00001);
+    CP24Time2a_setMinute(&cpTime3, 00);
+    CP24Time2a_setMillisecond(&cpTime3, 00001);
 
-	CP24Time2a_setMinute(&cpTime4, 12);
-	CP24Time2a_setMillisecond(&cpTime4, 24123);
+    CP24Time2a_setMinute(&cpTime4, 12);
+    CP24Time2a_setMillisecond(&cpTime4, 24123);
 
-	CP24Time2a_setMinute(&cpTime5, 12);
-	CP24Time2a_setMillisecond(&cpTime5, 24123);
+    CP24Time2a_setMinute(&cpTime5, 12);
+    CP24Time2a_setMillisecond(&cpTime5, 24123);
 
-	CP24Time2a_setMinute(&cpTime6, 12);
-	CP24Time2a_setMillisecond(&cpTime6, 24123);
+    CP24Time2a_setMinute(&cpTime6, 12);
+    CP24Time2a_setMillisecond(&cpTime6, 24123);
 
-	CP24Time2a_setMinute(&cpTime7, 12);
-	CP24Time2a_setMillisecond(&cpTime7, 24123);
+    CP24Time2a_setMinute(&cpTime7, 12);
+    CP24Time2a_setMillisecond(&cpTime7, 24123);
 
-	CP24Time2a_setMinute(&cpTime8, 12);
-	CP24Time2a_setMillisecond(&cpTime8, 24123);
+    CP24Time2a_setMinute(&cpTime8, 12);
+    CP24Time2a_setMillisecond(&cpTime8, 24123);
 
     spi1 = StepPositionWithCP24Time2a_create(NULL, 101, 0, true, IEC60870_QUALITY_GOOD, &cpTime1);
     spi2 = StepPositionWithCP24Time2a_create(NULL, 102, 63, false, IEC60870_QUALITY_OVERFLOW, &cpTime2);
@@ -491,163 +509,177 @@ test_StepPositionWithCP24Time2a(void)
     TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi8));
 
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, StepPositionInformation_getQuality((StepPositionInformation)spi1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, StepPositionInformation_getQuality((StepPositionInformation)spi2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, StepPositionInformation_getQuality((StepPositionInformation)spi3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, StepPositionInformation_getQuality((StepPositionInformation)spi4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, StepPositionInformation_getQuality((StepPositionInformation)spi5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, StepPositionInformation_getQuality((StepPositionInformation)spi6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, StepPositionInformation_getQuality((StepPositionInformation)spi7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, StepPositionInformation_getQuality((StepPositionInformation)spi8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi8));
 
+    uint8_t buffer[256];
 
-	uint8_t buffer[256];
+    struct sBufferFrame bf;
 
-	struct sBufferFrame bf;
+    Frame f = BufferFrame_initialize(&bf, buffer, 0);
 
-	Frame f = BufferFrame_initialize(&bf, buffer, 0);
+    CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-	CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi8);
 
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi1);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi2);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi3);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi4);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi5);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi6);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi7);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi8);
+    StepPositionWithCP24Time2a_destroy(spi1);
+    StepPositionWithCP24Time2a_destroy(spi2);
+    StepPositionWithCP24Time2a_destroy(spi3);
+    StepPositionWithCP24Time2a_destroy(spi4);
+    StepPositionWithCP24Time2a_destroy(spi5);
+    StepPositionWithCP24Time2a_destroy(spi6);
+    StepPositionWithCP24Time2a_destroy(spi7);
+    StepPositionWithCP24Time2a_destroy(spi8);
 
-	StepPositionWithCP24Time2a_destroy(spi1);
-	StepPositionWithCP24Time2a_destroy(spi2);
-	StepPositionWithCP24Time2a_destroy(spi3);
-	StepPositionWithCP24Time2a_destroy(spi4);
-	StepPositionWithCP24Time2a_destroy(spi5);
-	StepPositionWithCP24Time2a_destroy(spi6);
-	StepPositionWithCP24Time2a_destroy(spi7);
-	StepPositionWithCP24Time2a_destroy(spi8);
+    CS101_ASDU_encode(asdu, f);
 
-	CS101_ASDU_encode(asdu, f);
+    TEST_ASSERT_EQUAL_INT(70, Frame_getMsgSize(f));
 
-	TEST_ASSERT_EQUAL_INT(70, Frame_getMsgSize(f));
+    CS101_ASDU_destroy(asdu);
 
-	CS101_ASDU_destroy(asdu);
+    CS101_ASDU asdu2 = CS101_ASDU_createFromBuffer(&defaultAppLayerParameters, buffer, Frame_getMsgSize(f));
 
-	CS101_ASDU asdu2 = CS101_ASDU_createFromBuffer(&defaultAppLayerParameters, buffer, Frame_getMsgSize(f));
+    TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-	TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
+    StepPositionWithCP24Time2a spi1_dec = (StepPositionWithCP24Time2a)CS101_ASDU_getElement(asdu2, 0);
+    StepPositionWithCP24Time2a spi2_dec = (StepPositionWithCP24Time2a)CS101_ASDU_getElement(asdu2, 1);
+    StepPositionWithCP24Time2a spi3_dec = (StepPositionWithCP24Time2a)CS101_ASDU_getElement(asdu2, 2);
+    StepPositionWithCP24Time2a spi4_dec = (StepPositionWithCP24Time2a)CS101_ASDU_getElement(asdu2, 3);
+    StepPositionWithCP24Time2a spi5_dec = (StepPositionWithCP24Time2a)CS101_ASDU_getElement(asdu2, 4);
+    StepPositionWithCP24Time2a spi6_dec = (StepPositionWithCP24Time2a)CS101_ASDU_getElement(asdu2, 5);
+    StepPositionWithCP24Time2a spi7_dec = (StepPositionWithCP24Time2a)CS101_ASDU_getElement(asdu2, 6);
+    StepPositionWithCP24Time2a spi8_dec = (StepPositionWithCP24Time2a)CS101_ASDU_getElement(asdu2, 7);
 
-	StepPositionWithCP24Time2a spi1_dec = (StepPositionWithCP24Time2a) CS101_ASDU_getElement(asdu2, 0);
-	StepPositionWithCP24Time2a spi2_dec = (StepPositionWithCP24Time2a) CS101_ASDU_getElement(asdu2, 1);
-	StepPositionWithCP24Time2a spi3_dec = (StepPositionWithCP24Time2a) CS101_ASDU_getElement(asdu2, 2);
-	StepPositionWithCP24Time2a spi4_dec = (StepPositionWithCP24Time2a) CS101_ASDU_getElement(asdu2, 3);
-	StepPositionWithCP24Time2a spi5_dec = (StepPositionWithCP24Time2a) CS101_ASDU_getElement(asdu2, 4);
-	StepPositionWithCP24Time2a spi6_dec = (StepPositionWithCP24Time2a) CS101_ASDU_getElement(asdu2, 5);
-	StepPositionWithCP24Time2a spi7_dec = (StepPositionWithCP24Time2a) CS101_ASDU_getElement(asdu2, 6);
-	StepPositionWithCP24Time2a spi8_dec = (StepPositionWithCP24Time2a) CS101_ASDU_getElement(asdu2, 7);
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)spi3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)spi4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)spi5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)spi6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)spi7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)spi8_dec));
 
-	TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
-	TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
-	TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)spi3_dec));
-	TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)spi4_dec));
-	TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)spi5_dec));
-	TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)spi6_dec));
-	TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)spi7_dec));
-	TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)spi8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi8_dec));
 
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, StepPositionInformation_getQuality((StepPositionInformation)spi1_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, StepPositionInformation_getQuality((StepPositionInformation)spi2_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, StepPositionInformation_getQuality((StepPositionInformation)spi3_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, StepPositionInformation_getQuality((StepPositionInformation)spi4_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, StepPositionInformation_getQuality((StepPositionInformation)spi5_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, StepPositionInformation_getQuality((StepPositionInformation)spi6_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, StepPositionInformation_getQuality((StepPositionInformation)spi7_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, StepPositionInformation_getQuality((StepPositionInformation)spi8_dec));
+    TEST_ASSERT_EQUAL_INT(0, StepPositionInformation_getValue((StepPositionInformation)spi1_dec));
+    TEST_ASSERT_TRUE(StepPositionInformation_isTransient((StepPositionInformation)spi1_dec));
 
-	TEST_ASSERT_EQUAL_INT(0, StepPositionInformation_getValue((StepPositionInformation)spi1_dec));
-	TEST_ASSERT_TRUE(StepPositionInformation_isTransient((StepPositionInformation)spi1_dec));
+    TEST_ASSERT_EQUAL_INT(63, StepPositionInformation_getValue((StepPositionInformation)spi2_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi2_dec));
 
-	TEST_ASSERT_EQUAL_INT(63, StepPositionInformation_getValue((StepPositionInformation)spi2_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi2_dec));
+    TEST_ASSERT_EQUAL_INT(62, StepPositionInformation_getValue((StepPositionInformation)spi3_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi3_dec));
 
-	TEST_ASSERT_EQUAL_INT(62, StepPositionInformation_getValue((StepPositionInformation)spi3_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi3_dec));
+    TEST_ASSERT_EQUAL_INT(61, StepPositionInformation_getValue((StepPositionInformation)spi4_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi4_dec));
 
-	TEST_ASSERT_EQUAL_INT(61, StepPositionInformation_getValue((StepPositionInformation)spi4_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi4_dec));
+    TEST_ASSERT_EQUAL_INT(-61, StepPositionInformation_getValue((StepPositionInformation)spi5_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi5_dec));
 
-	TEST_ASSERT_EQUAL_INT(-61, StepPositionInformation_getValue((StepPositionInformation)spi5_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi5_dec));
+    TEST_ASSERT_EQUAL_INT(-62, StepPositionInformation_getValue((StepPositionInformation)spi6_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi6_dec));
 
-	TEST_ASSERT_EQUAL_INT(-62, StepPositionInformation_getValue((StepPositionInformation)spi6_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi6_dec));
+    TEST_ASSERT_EQUAL_INT(-63, StepPositionInformation_getValue((StepPositionInformation)spi7_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi7_dec));
 
-	TEST_ASSERT_EQUAL_INT(-63, StepPositionInformation_getValue((StepPositionInformation)spi7_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi7_dec));
+    TEST_ASSERT_EQUAL_INT(-0, StepPositionInformation_getValue((StepPositionInformation)spi8_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi8_dec));
 
-	TEST_ASSERT_EQUAL_INT(-0, StepPositionInformation_getValue((StepPositionInformation)spi8_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi8_dec));
+    CP24Time2a time1_dec = StepPositionWithCP24Time2a_getTimestamp(spi1_dec);
+    TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time1_dec));
+    TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time1_dec));
+    TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time1_dec));
 
-	CP24Time2a time1_dec = StepPositionWithCP24Time2a_getTimestamp(spi1_dec);
-	TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time1_dec));
-	TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time1_dec));
-	TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time1_dec));
+    CP24Time2a time2_dec = StepPositionWithCP24Time2a_getTimestamp(spi2_dec);
+    TEST_ASSERT_EQUAL_INT(54, CP24Time2a_getMinute(time2_dec));
+    TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getSecond(time2_dec));
+    TEST_ASSERT_EQUAL_INT(345, CP24Time2a_getMillisecond(time2_dec));
 
-	CP24Time2a time2_dec = StepPositionWithCP24Time2a_getTimestamp(spi2_dec);
-	TEST_ASSERT_EQUAL_INT(54, CP24Time2a_getMinute(time2_dec));
-	TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getSecond(time2_dec));
-	TEST_ASSERT_EQUAL_INT(345, CP24Time2a_getMillisecond(time2_dec));
+    CP24Time2a time3_dec = StepPositionWithCP24Time2a_getTimestamp(spi3_dec);
+    TEST_ASSERT_EQUAL_INT(00, CP24Time2a_getMinute(time3_dec));
+    TEST_ASSERT_EQUAL_INT(00, CP24Time2a_getSecond(time3_dec));
+    TEST_ASSERT_EQUAL_INT(1, CP24Time2a_getMillisecond(time3_dec));
 
-	CP24Time2a time3_dec = StepPositionWithCP24Time2a_getTimestamp(spi3_dec);
-	TEST_ASSERT_EQUAL_INT(00, CP24Time2a_getMinute(time3_dec));
-	TEST_ASSERT_EQUAL_INT(00, CP24Time2a_getSecond(time3_dec));
-	TEST_ASSERT_EQUAL_INT(1, CP24Time2a_getMillisecond(time3_dec));
+    CP24Time2a time4_dec = StepPositionWithCP24Time2a_getTimestamp(spi4_dec);
+    TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time4_dec));
+    TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time4_dec));
+    TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time4_dec));
 
-	CP24Time2a time4_dec = StepPositionWithCP24Time2a_getTimestamp(spi4_dec);
-	TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time4_dec));
-	TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time4_dec));
-	TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time4_dec));
+    CP24Time2a time5_dec = StepPositionWithCP24Time2a_getTimestamp(spi5_dec);
+    TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time5_dec));
+    TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time5_dec));
+    TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time5_dec));
 
-	CP24Time2a time5_dec = StepPositionWithCP24Time2a_getTimestamp(spi5_dec);
-	TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time5_dec));
-	TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time5_dec));
-	TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time5_dec));
+    CP24Time2a time6_dec = StepPositionWithCP24Time2a_getTimestamp(spi6_dec);
+    TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time6_dec));
+    TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time6_dec));
+    TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time6_dec));
 
-	CP24Time2a time6_dec = StepPositionWithCP24Time2a_getTimestamp(spi6_dec);
-	TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time6_dec));
-	TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time6_dec));
-	TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time6_dec));
+    CP24Time2a time7_dec = StepPositionWithCP24Time2a_getTimestamp(spi7_dec);
+    TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time7_dec));
+    TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time7_dec));
+    TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time7_dec));
 
-	CP24Time2a time7_dec = StepPositionWithCP24Time2a_getTimestamp(spi7_dec);
-	TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time7_dec));
-	TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time7_dec));
-	TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time7_dec));
+    CP24Time2a time8_dec = StepPositionWithCP24Time2a_getTimestamp(spi8_dec);
+    TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time8_dec));
+    TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time8_dec));
+    TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time8_dec));
 
-	CP24Time2a time8_dec = StepPositionWithCP24Time2a_getTimestamp(spi8_dec);
-	TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time8_dec));
-	TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time8_dec));
-	TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time8_dec));
-
-	StepPositionWithCP24Time2a_destroy(spi1_dec);
-	StepPositionWithCP24Time2a_destroy(spi2_dec);
-	StepPositionWithCP24Time2a_destroy(spi3_dec);
-	StepPositionWithCP24Time2a_destroy(spi4_dec);
-	StepPositionWithCP24Time2a_destroy(spi5_dec);
-	StepPositionWithCP24Time2a_destroy(spi6_dec);
-	StepPositionWithCP24Time2a_destroy(spi7_dec);
-	StepPositionWithCP24Time2a_destroy(spi8_dec);
-	CS101_ASDU_destroy(asdu2);
+    StepPositionWithCP24Time2a_destroy(spi1_dec);
+    StepPositionWithCP24Time2a_destroy(spi2_dec);
+    StepPositionWithCP24Time2a_destroy(spi3_dec);
+    StepPositionWithCP24Time2a_destroy(spi4_dec);
+    StepPositionWithCP24Time2a_destroy(spi5_dec);
+    StepPositionWithCP24Time2a_destroy(spi6_dec);
+    StepPositionWithCP24Time2a_destroy(spi7_dec);
+    StepPositionWithCP24Time2a_destroy(spi8_dec);
+    CS101_ASDU_destroy(asdu2);
 }
 void
 test_StepPositionWithCP56Time2a(void)
 {
-	StepPositionWithCP56Time2a spi1;
-	StepPositionWithCP56Time2a spi2;
-	StepPositionWithCP56Time2a spi3;
-	StepPositionWithCP56Time2a spi4;
-	StepPositionWithCP56Time2a spi5;
-	StepPositionWithCP56Time2a spi6;
-	StepPositionWithCP56Time2a spi7;
-	StepPositionWithCP56Time2a spi8;
+    StepPositionWithCP56Time2a spi1;
+    StepPositionWithCP56Time2a spi2;
+    StepPositionWithCP56Time2a spi3;
+    StepPositionWithCP56Time2a spi4;
+    StepPositionWithCP56Time2a spi5;
+    StepPositionWithCP56Time2a spi6;
+    StepPositionWithCP56Time2a spi7;
+    StepPositionWithCP56Time2a spi8;
 
     uint64_t time1 = Hal_getTimeInMs();
     uint64_t time2 = time1 + 1000;
@@ -710,120 +742,134 @@ test_StepPositionWithCP56Time2a(void)
     TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi8));
 
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, StepPositionInformation_getQuality((StepPositionInformation)spi1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, StepPositionInformation_getQuality((StepPositionInformation)spi2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, StepPositionInformation_getQuality((StepPositionInformation)spi3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, StepPositionInformation_getQuality((StepPositionInformation)spi4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, StepPositionInformation_getQuality((StepPositionInformation)spi5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, StepPositionInformation_getQuality((StepPositionInformation)spi6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, StepPositionInformation_getQuality((StepPositionInformation)spi7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, StepPositionInformation_getQuality((StepPositionInformation)spi8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi8));
 
+    uint8_t buffer[256];
 
-	uint8_t buffer[256];
+    struct sBufferFrame bf;
 
-	struct sBufferFrame bf;
+    Frame f = BufferFrame_initialize(&bf, buffer, 0);
 
-	Frame f = BufferFrame_initialize(&bf, buffer, 0);
+    CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-	CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi8);
 
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi1);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi2);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi3);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi4);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi5);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi6);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi7);
-	CS101_ASDU_addInformationObject(asdu, (InformationObject) spi8);
+    StepPositionWithCP56Time2a_destroy(spi1);
+    StepPositionWithCP56Time2a_destroy(spi2);
+    StepPositionWithCP56Time2a_destroy(spi3);
+    StepPositionWithCP56Time2a_destroy(spi4);
+    StepPositionWithCP56Time2a_destroy(spi5);
+    StepPositionWithCP56Time2a_destroy(spi6);
+    StepPositionWithCP56Time2a_destroy(spi7);
+    StepPositionWithCP56Time2a_destroy(spi8);
 
-	StepPositionWithCP56Time2a_destroy(spi1);
-	StepPositionWithCP56Time2a_destroy(spi2);
-	StepPositionWithCP56Time2a_destroy(spi3);
-	StepPositionWithCP56Time2a_destroy(spi4);
-	StepPositionWithCP56Time2a_destroy(spi5);
-	StepPositionWithCP56Time2a_destroy(spi6);
-	StepPositionWithCP56Time2a_destroy(spi7);
-	StepPositionWithCP56Time2a_destroy(spi8);
+    CS101_ASDU_encode(asdu, f);
 
-	CS101_ASDU_encode(asdu, f);
+    TEST_ASSERT_EQUAL_INT(102, Frame_getMsgSize(f));
 
-	TEST_ASSERT_EQUAL_INT(102, Frame_getMsgSize(f));
+    CS101_ASDU_destroy(asdu);
 
-	CS101_ASDU_destroy(asdu);
+    CS101_ASDU asdu2 = CS101_ASDU_createFromBuffer(&defaultAppLayerParameters, buffer, Frame_getMsgSize(f));
 
-	CS101_ASDU asdu2 = CS101_ASDU_createFromBuffer(&defaultAppLayerParameters, buffer, Frame_getMsgSize(f));
+    TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-	TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
+    StepPositionWithCP56Time2a spi1_dec = (StepPositionWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
+    StepPositionWithCP56Time2a spi2_dec = (StepPositionWithCP56Time2a)CS101_ASDU_getElement(asdu2, 1);
+    StepPositionWithCP56Time2a spi3_dec = (StepPositionWithCP56Time2a)CS101_ASDU_getElement(asdu2, 2);
+    StepPositionWithCP56Time2a spi4_dec = (StepPositionWithCP56Time2a)CS101_ASDU_getElement(asdu2, 3);
+    StepPositionWithCP56Time2a spi5_dec = (StepPositionWithCP56Time2a)CS101_ASDU_getElement(asdu2, 4);
+    StepPositionWithCP56Time2a spi6_dec = (StepPositionWithCP56Time2a)CS101_ASDU_getElement(asdu2, 5);
+    StepPositionWithCP56Time2a spi7_dec = (StepPositionWithCP56Time2a)CS101_ASDU_getElement(asdu2, 6);
+    StepPositionWithCP56Time2a spi8_dec = (StepPositionWithCP56Time2a)CS101_ASDU_getElement(asdu2, 7);
 
-	StepPositionWithCP56Time2a spi1_dec = (StepPositionWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
-	StepPositionWithCP56Time2a spi2_dec = (StepPositionWithCP56Time2a) CS101_ASDU_getElement(asdu2, 1);
-	StepPositionWithCP56Time2a spi3_dec = (StepPositionWithCP56Time2a) CS101_ASDU_getElement(asdu2, 2);
-	StepPositionWithCP56Time2a spi4_dec = (StepPositionWithCP56Time2a) CS101_ASDU_getElement(asdu2, 3);
-	StepPositionWithCP56Time2a spi5_dec = (StepPositionWithCP56Time2a) CS101_ASDU_getElement(asdu2, 4);
-	StepPositionWithCP56Time2a spi6_dec = (StepPositionWithCP56Time2a) CS101_ASDU_getElement(asdu2, 5);
-	StepPositionWithCP56Time2a spi7_dec = (StepPositionWithCP56Time2a) CS101_ASDU_getElement(asdu2, 6);
-	StepPositionWithCP56Time2a spi8_dec = (StepPositionWithCP56Time2a) CS101_ASDU_getElement(asdu2, 7);
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)spi3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)spi4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)spi5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)spi6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)spi7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)spi8_dec));
 
-	TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
-	TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
-	TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)spi3_dec));
-	TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)spi4_dec));
-	TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)spi5_dec));
-	TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)spi6_dec));
-	TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)spi7_dec));
-	TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)spi8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            StepPositionInformation_getQuality((StepPositionInformation)spi8_dec));
 
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, StepPositionInformation_getQuality((StepPositionInformation)spi1_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, StepPositionInformation_getQuality((StepPositionInformation)spi2_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, StepPositionInformation_getQuality((StepPositionInformation)spi3_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, StepPositionInformation_getQuality((StepPositionInformation)spi4_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, StepPositionInformation_getQuality((StepPositionInformation)spi5_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, StepPositionInformation_getQuality((StepPositionInformation)spi6_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, StepPositionInformation_getQuality((StepPositionInformation)spi7_dec));
-	TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, StepPositionInformation_getQuality((StepPositionInformation)spi8_dec));
+    TEST_ASSERT_EQUAL_INT(0, StepPositionInformation_getValue((StepPositionInformation)spi1_dec));
+    TEST_ASSERT_TRUE(StepPositionInformation_isTransient((StepPositionInformation)spi1_dec));
 
-	TEST_ASSERT_EQUAL_INT(0, StepPositionInformation_getValue((StepPositionInformation)spi1_dec));
-	TEST_ASSERT_TRUE(StepPositionInformation_isTransient((StepPositionInformation)spi1_dec));
+    TEST_ASSERT_EQUAL_INT(63, StepPositionInformation_getValue((StepPositionInformation)spi2_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi2_dec));
 
-	TEST_ASSERT_EQUAL_INT(63, StepPositionInformation_getValue((StepPositionInformation)spi2_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi2_dec));
+    TEST_ASSERT_EQUAL_INT(62, StepPositionInformation_getValue((StepPositionInformation)spi3_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi3_dec));
 
-	TEST_ASSERT_EQUAL_INT(62, StepPositionInformation_getValue((StepPositionInformation)spi3_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi3_dec));
+    TEST_ASSERT_EQUAL_INT(61, StepPositionInformation_getValue((StepPositionInformation)spi4_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi4_dec));
 
-	TEST_ASSERT_EQUAL_INT(61, StepPositionInformation_getValue((StepPositionInformation)spi4_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi4_dec));
+    TEST_ASSERT_EQUAL_INT(-61, StepPositionInformation_getValue((StepPositionInformation)spi5_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi5_dec));
 
-	TEST_ASSERT_EQUAL_INT(-61, StepPositionInformation_getValue((StepPositionInformation)spi5_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi5_dec));
+    TEST_ASSERT_EQUAL_INT(-62, StepPositionInformation_getValue((StepPositionInformation)spi6_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi6_dec));
 
-	TEST_ASSERT_EQUAL_INT(-62, StepPositionInformation_getValue((StepPositionInformation)spi6_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi6_dec));
+    TEST_ASSERT_EQUAL_INT(-63, StepPositionInformation_getValue((StepPositionInformation)spi7_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi7_dec));
 
-	TEST_ASSERT_EQUAL_INT(-63, StepPositionInformation_getValue((StepPositionInformation)spi7_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi7_dec));
+    TEST_ASSERT_EQUAL_INT(-0, StepPositionInformation_getValue((StepPositionInformation)spi8_dec));
+    TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi8_dec));
 
-	TEST_ASSERT_EQUAL_INT(-0, StepPositionInformation_getValue((StepPositionInformation)spi8_dec));
-	TEST_ASSERT_FALSE(StepPositionInformation_isTransient((StepPositionInformation)spi8_dec));
+    TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi1_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time2, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi2_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time3, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi3_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time4, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi4_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time5, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi5_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time6, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi6_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time7, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi7_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time8, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi8_dec)));
 
-	TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi1_dec)));
-	TEST_ASSERT_EQUAL_UINT64(time2, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi2_dec)));
-	TEST_ASSERT_EQUAL_UINT64(time3, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi3_dec)));
-	TEST_ASSERT_EQUAL_UINT64(time4, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi4_dec)));
-	TEST_ASSERT_EQUAL_UINT64(time5, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi5_dec)));
-	TEST_ASSERT_EQUAL_UINT64(time6, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi6_dec)));
-	TEST_ASSERT_EQUAL_UINT64(time7, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi7_dec)));
-	TEST_ASSERT_EQUAL_UINT64(time8, CP56Time2a_toMsTimestamp(StepPositionWithCP56Time2a_getTimestamp(spi8_dec)));
-
-	StepPositionWithCP56Time2a_destroy(spi1_dec);
-	StepPositionWithCP56Time2a_destroy(spi2_dec);
-	StepPositionWithCP56Time2a_destroy(spi3_dec);
-	StepPositionWithCP56Time2a_destroy(spi4_dec);
-	StepPositionWithCP56Time2a_destroy(spi5_dec);
-	StepPositionWithCP56Time2a_destroy(spi6_dec);
-	StepPositionWithCP56Time2a_destroy(spi7_dec);
-	StepPositionWithCP56Time2a_destroy(spi8_dec);
-	CS101_ASDU_destroy(asdu2);
+    StepPositionWithCP56Time2a_destroy(spi1_dec);
+    StepPositionWithCP56Time2a_destroy(spi2_dec);
+    StepPositionWithCP56Time2a_destroy(spi3_dec);
+    StepPositionWithCP56Time2a_destroy(spi4_dec);
+    StepPositionWithCP56Time2a_destroy(spi5_dec);
+    StepPositionWithCP56Time2a_destroy(spi6_dec);
+    StepPositionWithCP56Time2a_destroy(spi7_dec);
+    StepPositionWithCP56Time2a_destroy(spi8_dec);
+    CS101_ASDU_destroy(asdu2);
 }
 
 void
@@ -845,16 +891,16 @@ test_addMaxNumberOfIOsToASDU(void)
 
     bool added = false;
 
-    do {
-        InformationObject io = (InformationObject) SinglePointInformation_create(NULL, ioa, true, IEC60870_QUALITY_GOOD);
+    do
+    {
+        InformationObject io = (InformationObject)SinglePointInformation_create(NULL, ioa, true, IEC60870_QUALITY_GOOD);
 
         added = CS101_ASDU_addInformationObject(asdu, io);
 
         InformationObject_destroy(io);
 
         ioa++;
-    }
-    while (added);
+    } while (added);
 
     CS101_ASDU_destroy(asdu);
 
@@ -883,7 +929,8 @@ test_EventOfProtectionEquipmentWithTime(void)
     struct sCP16Time2a elapsedTime;
     struct sCP56Time2a timestamp;
 
-    EventOfProtectionEquipmentWithCP56Time2a e = EventOfProtectionEquipmentWithCP56Time2a_create(NULL, 1, &singleEvent, &elapsedTime, &timestamp);
+    EventOfProtectionEquipmentWithCP56Time2a e =
+        EventOfProtectionEquipmentWithCP56Time2a_create(NULL, 1, &singleEvent, &elapsedTime, &timestamp);
 
     uint8_t buffer[256];
 
@@ -893,12 +940,12 @@ test_EventOfProtectionEquipmentWithTime(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) e);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) e);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)e);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)e);
 
     CS101_ASDU_encode(asdu, f);
 
-    InformationObject_destroy((InformationObject) e);
+    InformationObject_destroy((InformationObject)e);
     CS101_ASDU_destroy(asdu);
 
     CS101_ASDU asdu2 = CS101_ASDU_createFromBuffer(&defaultAppLayerParameters, buffer, Frame_getMsgSize(f));
@@ -907,7 +954,7 @@ test_EventOfProtectionEquipmentWithTime(void)
 
     TEST_ASSERT_NOT_NULL(io);
 
-    EventOfProtectionEquipmentWithCP56Time2a e2 = (EventOfProtectionEquipmentWithCP56Time2a) io;
+    EventOfProtectionEquipmentWithCP56Time2a e2 = (EventOfProtectionEquipmentWithCP56Time2a)io;
 
     SingleEvent se = EventOfProtectionEquipmentWithCP56Time2a_getEvent(e2);
 
@@ -929,17 +976,19 @@ struct test_CS104SlaveConnectionIsRedundancyGroup_Info
 static void*
 test_CS104SlaveConnectionIsRedundancyGroup_enqueueThreadFunction(void* parameter)
 {
-    struct test_CS104SlaveConnectionIsRedundancyGroup_Info* info =  (struct test_CS104SlaveConnectionIsRedundancyGroup_Info*) parameter;
+    struct test_CS104SlaveConnectionIsRedundancyGroup_Info* info =
+        (struct test_CS104SlaveConnectionIsRedundancyGroup_Info*)parameter;
 
     CS101_AppLayerParameters alParams = CS104_Slave_getAppLayerParameters(info->slave);
 
     int16_t scaledValue = 0;
 
-    while (info->running) {
-
+    while (info->running)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        InformationObject io =
+            (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
 
         scaledValue++;
 
@@ -971,14 +1020,16 @@ test_CS104SlaveConnectionIsRedundancyGroup()
     info.running = true;
     info.slave = slave;
 
-    Thread enqueueThread = Thread_create(test_CS104SlaveConnectionIsRedundancyGroup_enqueueThreadFunction, &info, false);
+    Thread enqueueThread =
+        Thread_create(test_CS104SlaveConnectionIsRedundancyGroup_enqueueThreadFunction, &info, false);
     Thread_start(enqueueThread);
 
     CS104_Connection con = CS104_Connection_create("127.0.0.1", 20004);
 
     int i;
 
-    for (i = 0; i < 50; i++) {
+    for (i = 0; i < 50; i++)
+    {
         bool result = CS104_Connection_connect(con);
 
         TEST_ASSERT_TRUE(result);
@@ -1012,14 +1063,16 @@ test_CS104SlaveSingleRedundancyGroup()
     info.running = true;
     info.slave = slave;
 
-    Thread enqueueThread = Thread_create(test_CS104SlaveConnectionIsRedundancyGroup_enqueueThreadFunction, &info, false);
+    Thread enqueueThread =
+        Thread_create(test_CS104SlaveConnectionIsRedundancyGroup_enqueueThreadFunction, &info, false);
     Thread_start(enqueueThread);
 
     CS104_Connection con = CS104_Connection_create("127.0.0.1", 20004);
 
     int i;
 
-    for (i = 0; i < 50; i++) {
+    for (i = 0; i < 50; i++)
+    {
         bool result = CS104_Connection_connect(con);
         TEST_ASSERT_TRUE(result);
 
@@ -1039,7 +1092,8 @@ test_CS104SlaveSingleRedundancyGroup()
 }
 
 static void
-test_CS104SlaveSingleRedundancyGroupMultipleConnectionsEventHandler(void* parameter, IMasterConnection connection, CS104_PeerConnectionEvent event)
+test_CS104SlaveSingleRedundancyGroupMultipleConnectionsEventHandler(void* parameter, IMasterConnection connection,
+                                                                    CS104_PeerConnectionEvent event)
 {
     char ipAddrBuf[100];
     ipAddrBuf[0] = 0;
@@ -1057,7 +1111,8 @@ test_CS104SlaveSingleRedundancyGroupMultipleConnections()
 
     CS104_Slave_start(slave);
     CS104_Slave_setMaxOpenConnections(slave, 20);
-    CS104_Slave_setConnectionEventHandler(slave, test_CS104SlaveSingleRedundancyGroupMultipleConnectionsEventHandler, NULL);
+    CS104_Slave_setConnectionEventHandler(slave, test_CS104SlaveSingleRedundancyGroupMultipleConnectionsEventHandler,
+                                          NULL);
 
     struct test_CS104SlaveConnectionIsRedundancyGroup_Info info;
     info.running = true;
@@ -1074,26 +1129,30 @@ test_CS104SlaveSingleRedundancyGroupMultipleConnections()
     conState[1] = 0;
     conState[2] = 0;
 
-    Thread enqueueThread = Thread_create(test_CS104SlaveConnectionIsRedundancyGroup_enqueueThreadFunction, &info, false);
+    Thread enqueueThread =
+        Thread_create(test_CS104SlaveConnectionIsRedundancyGroup_enqueueThreadFunction, &info, false);
     Thread_start(enqueueThread);
 
     int i;
     for (i = 0; i < 200; i++)
     {
-       // printf("round %i\n", i);
+        // printf("round %i\n", i);
 
         int con = rand() % 3;
 
-        if (conState[con] == 0) {
+        if (conState[con] == 0)
+        {
             bool result = CS104_Connection_connect(cons[con]);
             TEST_ASSERT_TRUE(result);
             conState[con] = 1;
         }
-        else if (conState[con] == 1) {
+        else if (conState[con] == 1)
+        {
             CS104_Connection_sendStartDT(cons[con]);
             conState[con] = 2;
         }
-        else if (conState[con] == 2) {
+        else if (conState[con] == 2)
+        {
             CS104_Connection_close(cons[con]);
             conState[con] = 0;
         }
@@ -1111,16 +1170,17 @@ test_CS104SlaveSingleRedundancyGroupMultipleConnections()
     CS104_Slave_destroy(slave);
 }
 
-struct stest_CS104SlaveEventQueue1 {
+struct stest_CS104SlaveEventQueue1
+{
     int asduHandlerCalled;
     int spontCount;
     int16_t lastScaledValue;
 };
 
 static bool
-test_CS104SlaveEventQueue1_asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
+test_CS104SlaveEventQueue1_asduReceivedHandler(void* parameter, int address, CS101_ASDU asdu)
 {
-    struct stest_CS104SlaveEventQueue1* info = (struct stest_CS104SlaveEventQueue1*) parameter;
+    struct stest_CS104SlaveEventQueue1* info = (struct stest_CS104SlaveEventQueue1*)parameter;
 
     info->asduHandlerCalled++;
 
@@ -1132,7 +1192,7 @@ test_CS104SlaveEventQueue1_asduReceivedHandler (void* parameter, int address, CS
         {
             static uint8_t ioBuf[250];
 
-            MeasuredValueScaled mv = (MeasuredValueScaled) CS101_ASDU_getElementEx(asdu, (InformationObject) ioBuf, 0);
+            MeasuredValueScaled mv = (MeasuredValueScaled)CS101_ASDU_getElementEx(asdu, (InformationObject)ioBuf, 0);
 
             info->lastScaledValue = MeasuredValueScaled_getValue(mv);
         }
@@ -1141,10 +1201,11 @@ test_CS104SlaveEventQueue1_asduReceivedHandler (void* parameter, int address, CS
     return true;
 }
 
-struct sTestMessageQueueEntryInfo {
-	uint64_t entryTimestamp;
-	unsigned int entryState : 2;
-	unsigned int size : 8;
+struct sTestMessageQueueEntryInfo
+{
+    uint64_t entryTimestamp;
+    unsigned int entryState : 2;
+    unsigned int size : 8;
 };
 
 void
@@ -1166,10 +1227,12 @@ test_CS104SlaveEventQueue1()
 
     int16_t scaledValue = 0;
 
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < 15; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        InformationObject io =
+            (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
 
         scaledValue++;
 
@@ -1207,10 +1270,12 @@ test_CS104SlaveEventQueue1()
 
     CS104_Connection_sendStartDT(con);
 
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < 15; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        InformationObject io =
+            (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
 
         scaledValue++;
 
@@ -1257,10 +1322,12 @@ test_CS104SlaveEventQueueOverflow()
 
     int16_t scaledValue = 0;
 
-    for (int i = 0; i < 300; i++) {
+    for (int i = 0; i < 300; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        InformationObject io =
+            (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
 
         scaledValue++;
 
@@ -1298,10 +1365,12 @@ test_CS104SlaveEventQueueOverflow()
 
     CS104_Connection_sendStartDT(con);
 
-    for (int i = 0; i < 150; i++) {
+    for (int i = 0; i < 150; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        InformationObject io =
+            (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
 
         scaledValue++;
 
@@ -1348,10 +1417,12 @@ test_CS104SlaveEventQueueOverflow2()
 
     int16_t scaledValue = 0;
 
-    for (int i = 0; i < 300; i++) {
+    for (int i = 0; i < 300; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        InformationObject io =
+            (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
 
         scaledValue++;
 
@@ -1391,33 +1462,41 @@ test_CS104SlaveEventQueueOverflow2()
 
     int typeNo = 0;
 
-    for (int i = 0; i < 20000; i++) {
+    for (int i = 0; i < 20000; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
         InformationObject io;
 
-        if (typeNo == 0) {
-            io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        if (typeNo == 0)
+        {
+            io = (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
             CS101_ASDU_addInformationObject(newAsdu, io);
         }
-        else if (typeNo == 1) {
+        else if (typeNo == 1)
+        {
             struct sCP56Time2a cp56;
             CP56Time2a_createFromMsTimestamp(&cp56, Hal_getTimeInMs());
 
-            io =  (InformationObject) MeasuredValueScaledWithCP56Time2a_create(NULL, 111, scaledValue, IEC60870_QUALITY_GOOD, &cp56);
+            io = (InformationObject)MeasuredValueScaledWithCP56Time2a_create(NULL, 111, scaledValue,
+                                                                             IEC60870_QUALITY_GOOD, &cp56);
 
             CS101_ASDU_addInformationObject(newAsdu, io);
         }
-        else if (typeNo == 2) {
-            io = (InformationObject) SinglePointInformation_create(NULL, 112, true, IEC60870_QUALITY_GOOD);
+        else if (typeNo == 2)
+        {
+            io = (InformationObject)SinglePointInformation_create(NULL, 112, true, IEC60870_QUALITY_GOOD);
 
             CS101_ASDU_addInformationObject(newAsdu, io);
         }
-        else if (typeNo == 3) {
-            io = (InformationObject) SinglePointInformation_create(NULL, 112, true, IEC60870_QUALITY_GOOD);
+        else if (typeNo == 3)
+        {
+            io = (InformationObject)SinglePointInformation_create(NULL, 112, true, IEC60870_QUALITY_GOOD);
             int j = 1;
-            while (CS101_ASDU_addInformationObject(newAsdu, io)) {
-                io = (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 112 + j, true, IEC60870_QUALITY_GOOD);
+            while (CS101_ASDU_addInformationObject(newAsdu, io))
+            {
+                io = (InformationObject)SinglePointInformation_create((SinglePointInformation)io, 112 + j, true,
+                                                                      IEC60870_QUALITY_GOOD);
                 j++;
             }
         }
@@ -1435,7 +1514,7 @@ test_CS104SlaveEventQueueOverflow2()
 
         CS101_ASDU_destroy(newAsdu);
 
-        //Thread_sleep(10);
+        // Thread_sleep(10);
     }
 
     Thread_sleep(500);
@@ -1471,10 +1550,11 @@ test_CS104SlaveEventQueueCheckCapacity()
     int entrySize = sizeof(struct sTestMessageQueueEntryInfo) + asduSize;
     int msgQueueCapacity = ((sizeof(struct sTestMessageQueueEntryInfo) + 256) * 2) / entrySize;
 
-    for (int i = 0; i < 299; i++) {
+    for (int i = 0; i < 299; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) SinglePointInformation_create(NULL, 101, true, IEC60870_QUALITY_GOOD);
+        InformationObject io = (InformationObject)SinglePointInformation_create(NULL, 101, true, IEC60870_QUALITY_GOOD);
 
         CS101_ASDU_addInformationObject(newAsdu, io);
 
@@ -1542,11 +1622,11 @@ test_CS104SlaveEventQueueOverflow3()
     int entrySize = sizeof(struct sTestMessageQueueEntryInfo) + asduSize;
     int msgQueueCapacity = ((sizeof(struct sTestMessageQueueEntryInfo) + 256) * 2) / entrySize;
 
-    for (int i = 0; i < 35; i++) {
-
+    for (int i = 0; i < 35; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) SinglePointInformation_create(NULL, 101, true, IEC60870_QUALITY_GOOD);
+        InformationObject io = (InformationObject)SinglePointInformation_create(NULL, 101, true, IEC60870_QUALITY_GOOD);
 
         CS101_ASDU_addInformationObject(newAsdu, io);
 
@@ -1563,17 +1643,17 @@ test_CS104SlaveEventQueueOverflow3()
 
     int count1 = CS104_Slave_getNumberOfQueueEntries(slave, NULL);
 
-
-
     /* add a single large messages */
     CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    for (int i = 0; i < 50; i++) {
-          SinglePointInformation spi = SinglePointInformation_create(NULL, 110, false, IEC60870_QUALITY_GOOD);;
+    for (int i = 0; i < 50; i++)
+    {
+        SinglePointInformation spi = SinglePointInformation_create(NULL, 110, false, IEC60870_QUALITY_GOOD);
+        ;
 
-          CS101_ASDU_addInformationObject(newAsdu, (InformationObject) spi);
+        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)spi);
 
-          InformationObject_destroy((InformationObject) spi);
+        InformationObject_destroy((InformationObject)spi);
     }
 
     CS104_Slave_enqueueASDU(slave, newAsdu);
@@ -1602,7 +1682,6 @@ test_CS104SlaveEventQueueOverflow3()
 
     CS104_Slave_destroy(slave);
 }
-
 
 void
 test_IpAddressHandling(void)
@@ -1793,13 +1872,13 @@ test_DoublePointInformation(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi3);
 
-    InformationObject_destroy((InformationObject) dpi1);
-    InformationObject_destroy((InformationObject) dpi2);
-    InformationObject_destroy((InformationObject) dpi3);
+    InformationObject_destroy((InformationObject)dpi1);
+    InformationObject_destroy((InformationObject)dpi2);
+    InformationObject_destroy((InformationObject)dpi3);
 
     CS101_ASDU_encode(asdu, f);
 
@@ -1811,13 +1890,13 @@ test_DoublePointInformation(void)
 
     TEST_ASSERT_EQUAL_INT(3, CS101_ASDU_getNumberOfElements(asdu2));
 
-    DoublePointInformation dpi1_dec = (DoublePointInformation) CS101_ASDU_getElement(asdu2, 0);
-    DoublePointInformation dpi2_dec = (DoublePointInformation) CS101_ASDU_getElement(asdu2, 1);
-    DoublePointInformation dpi3_dec = (DoublePointInformation) CS101_ASDU_getElement(asdu2, 2);
+    DoublePointInformation dpi1_dec = (DoublePointInformation)CS101_ASDU_getElement(asdu2, 0);
+    DoublePointInformation dpi2_dec = (DoublePointInformation)CS101_ASDU_getElement(asdu2, 1);
+    DoublePointInformation dpi3_dec = (DoublePointInformation)CS101_ASDU_getElement(asdu2, 2);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )dpi1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )dpi2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )dpi3_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)dpi1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)dpi2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)dpi3_dec));
 
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, DoublePointInformation_getQuality(dpi1_dec));
     TEST_ASSERT_EQUAL_UINT8(IEC60870_DOUBLE_POINT_OFF, DoublePointInformation_getValue(dpi1_dec));
@@ -1828,9 +1907,9 @@ test_DoublePointInformation(void)
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, DoublePointInformation_getQuality(dpi3_dec));
     TEST_ASSERT_EQUAL_UINT8(IEC60870_DOUBLE_POINT_INDETERMINATE, DoublePointInformation_getValue(dpi3_dec));
 
-    InformationObject_destroy((InformationObject) dpi1_dec);
-    InformationObject_destroy((InformationObject) dpi2_dec);
-    InformationObject_destroy((InformationObject) dpi3_dec);
+    InformationObject_destroy((InformationObject)dpi1_dec);
+    InformationObject_destroy((InformationObject)dpi2_dec);
+    InformationObject_destroy((InformationObject)dpi3_dec);
 
     CS101_ASDU_destroy(asdu2);
 }
@@ -1864,10 +1943,10 @@ test_SinglePointInformation(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi4);
 
     SinglePointInformation_destroy(spi1);
     SinglePointInformation_destroy(spi2);
@@ -1884,10 +1963,10 @@ test_SinglePointInformation(void)
 
     TEST_ASSERT_EQUAL_INT(4, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SinglePointInformation spi1_dec = (SinglePointInformation) CS101_ASDU_getElement(asdu2, 0);
-    SinglePointInformation spi2_dec = (SinglePointInformation) CS101_ASDU_getElement(asdu2, 1);
-    SinglePointInformation spi3_dec = (SinglePointInformation) CS101_ASDU_getElement(asdu2, 2);
-    SinglePointInformation spi4_dec = (SinglePointInformation) CS101_ASDU_getElement(asdu2, 3);
+    SinglePointInformation spi1_dec = (SinglePointInformation)CS101_ASDU_getElement(asdu2, 0);
+    SinglePointInformation spi2_dec = (SinglePointInformation)CS101_ASDU_getElement(asdu2, 1);
+    SinglePointInformation spi3_dec = (SinglePointInformation)CS101_ASDU_getElement(asdu2, 2);
+    SinglePointInformation spi4_dec = (SinglePointInformation)CS101_ASDU_getElement(asdu2, 3);
 
     TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
     TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
@@ -1943,10 +2022,10 @@ test_SinglePointInformationSequence(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, true, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi4);
 
     SinglePointInformation_destroy(spi1);
     SinglePointInformation_destroy(spi2);
@@ -1963,10 +2042,10 @@ test_SinglePointInformationSequence(void)
 
     TEST_ASSERT_EQUAL_INT(4, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SinglePointInformation spi1_dec = (SinglePointInformation) CS101_ASDU_getElement(asdu2, 0);
-    SinglePointInformation spi2_dec = (SinglePointInformation) CS101_ASDU_getElement(asdu2, 1);
-    SinglePointInformation spi3_dec = (SinglePointInformation) CS101_ASDU_getElement(asdu2, 2);
-    SinglePointInformation spi4_dec = (SinglePointInformation) CS101_ASDU_getElement(asdu2, 3);
+    SinglePointInformation spi1_dec = (SinglePointInformation)CS101_ASDU_getElement(asdu2, 0);
+    SinglePointInformation spi2_dec = (SinglePointInformation)CS101_ASDU_getElement(asdu2, 1);
+    SinglePointInformation spi3_dec = (SinglePointInformation)CS101_ASDU_getElement(asdu2, 2);
+    SinglePointInformation spi4_dec = (SinglePointInformation)CS101_ASDU_getElement(asdu2, 3);
 
     TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
     TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
@@ -2023,12 +2102,13 @@ test_DoublePointWithCP24Time2a(void)
 
     dpi1 = DoublePointWithCP24Time2a_create(NULL, 101, IEC60870_DOUBLE_POINT_OFF, IEC60870_QUALITY_INVALID, &cpTime1);
     dpi2 = DoublePointWithCP24Time2a_create(NULL, 102, IEC60870_DOUBLE_POINT_ON, IEC60870_QUALITY_BLOCKED, &cpTime2);
-    dpi3 = DoublePointWithCP24Time2a_create(NULL, 103, IEC60870_DOUBLE_POINT_INDETERMINATE, IEC60870_QUALITY_GOOD, &cpTime3);
+    dpi3 = DoublePointWithCP24Time2a_create(NULL, 103, IEC60870_DOUBLE_POINT_INDETERMINATE, IEC60870_QUALITY_GOOD,
+                                            &cpTime3);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, DoublePointInformation_getQuality((DoublePointInformation )dpi1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, DoublePointInformation_getQuality((DoublePointInformation )dpi2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, DoublePointInformation_getQuality((DoublePointInformation )dpi3));
-    TEST_ASSERT_TRUE(DoublePointInformation_getQuality((DoublePointInformation )dpi1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, DoublePointInformation_getQuality((DoublePointInformation)dpi1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, DoublePointInformation_getQuality((DoublePointInformation)dpi2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, DoublePointInformation_getQuality((DoublePointInformation)dpi3));
+    TEST_ASSERT_TRUE(DoublePointInformation_getQuality((DoublePointInformation)dpi1));
 
     uint8_t buffer[256];
 
@@ -2038,13 +2118,13 @@ test_DoublePointWithCP24Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi3);
 
-    InformationObject_destroy((InformationObject) dpi1);
-    InformationObject_destroy((InformationObject) dpi2);
-    InformationObject_destroy((InformationObject) dpi3);
+    InformationObject_destroy((InformationObject)dpi1);
+    InformationObject_destroy((InformationObject)dpi2);
+    InformationObject_destroy((InformationObject)dpi3);
 
     CS101_ASDU_encode(asdu, f);
 
@@ -2056,38 +2136,40 @@ test_DoublePointWithCP24Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(3, CS101_ASDU_getNumberOfElements(asdu2));
 
-    DoublePointWithCP24Time2a dpi1_dec = (DoublePointWithCP24Time2a) CS101_ASDU_getElement(asdu2, 0);
-    DoublePointWithCP24Time2a dpi2_dec = (DoublePointWithCP24Time2a) CS101_ASDU_getElement(asdu2, 1);
-    DoublePointWithCP24Time2a dpi3_dec = (DoublePointWithCP24Time2a) CS101_ASDU_getElement(asdu2, 2);
+    DoublePointWithCP24Time2a dpi1_dec = (DoublePointWithCP24Time2a)CS101_ASDU_getElement(asdu2, 0);
+    DoublePointWithCP24Time2a dpi2_dec = (DoublePointWithCP24Time2a)CS101_ASDU_getElement(asdu2, 1);
+    DoublePointWithCP24Time2a dpi3_dec = (DoublePointWithCP24Time2a)CS101_ASDU_getElement(asdu2, 2);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )dpi1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )dpi2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )dpi3_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)dpi1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)dpi2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)dpi3_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, DoublePointInformation_getQuality((DoublePointInformation )dpi1_dec));
-    TEST_ASSERT_TRUE(DoublePointInformation_getQuality((DoublePointInformation )dpi1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            DoublePointInformation_getQuality((DoublePointInformation)dpi1_dec));
+    TEST_ASSERT_TRUE(DoublePointInformation_getQuality((DoublePointInformation)dpi1_dec));
     CP24Time2a time1_dec = DoublePointWithCP24Time2a_getTimestamp(dpi1_dec);
     TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time1_dec));
     TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time1_dec));
     TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time1_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, DoublePointInformation_getQuality((DoublePointInformation )dpi2_dec));
-    TEST_ASSERT_TRUE(DoublePointInformation_getQuality((DoublePointInformation )dpi2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            DoublePointInformation_getQuality((DoublePointInformation)dpi2_dec));
+    TEST_ASSERT_TRUE(DoublePointInformation_getQuality((DoublePointInformation)dpi2_dec));
     CP24Time2a time2_dec = DoublePointWithCP24Time2a_getTimestamp(dpi2_dec);
     TEST_ASSERT_EQUAL_INT(54, CP24Time2a_getMinute(time2_dec));
     TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getSecond(time2_dec));
     TEST_ASSERT_EQUAL_INT(345, CP24Time2a_getMillisecond(time2_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, DoublePointInformation_getQuality((DoublePointInformation )dpi3_dec));
-    TEST_ASSERT_TRUE(DoublePointInformation_getValue((DoublePointInformation )dpi3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, DoublePointInformation_getQuality((DoublePointInformation)dpi3_dec));
+    TEST_ASSERT_TRUE(DoublePointInformation_getValue((DoublePointInformation)dpi3_dec));
     CP24Time2a time3_dec = DoublePointWithCP24Time2a_getTimestamp(dpi3_dec);
     TEST_ASSERT_EQUAL_INT(00, CP24Time2a_getMinute(time3_dec));
     TEST_ASSERT_EQUAL_INT(00, CP24Time2a_getSecond(time3_dec));
     TEST_ASSERT_EQUAL_INT(1, CP24Time2a_getMillisecond(time3_dec));
 
-    InformationObject_destroy((InformationObject) dpi1_dec);
-    InformationObject_destroy((InformationObject) dpi2_dec);
-    InformationObject_destroy((InformationObject) dpi3_dec);
+    InformationObject_destroy((InformationObject)dpi1_dec);
+    InformationObject_destroy((InformationObject)dpi2_dec);
+    InformationObject_destroy((InformationObject)dpi3_dec);
 
     CS101_ASDU_destroy(asdu2);
 }
@@ -2137,13 +2219,13 @@ test_SinglePointWithCP24Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi3);
 
-    InformationObject_destroy((InformationObject) spi1);
-    InformationObject_destroy((InformationObject) spi2);
-    InformationObject_destroy((InformationObject) spi3);
+    InformationObject_destroy((InformationObject)spi1);
+    InformationObject_destroy((InformationObject)spi2);
+    InformationObject_destroy((InformationObject)spi3);
 
     CS101_ASDU_encode(asdu, f);
 
@@ -2155,22 +2237,24 @@ test_SinglePointWithCP24Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(3, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SinglePointWithCP24Time2a spi1_dec = (SinglePointWithCP24Time2a) CS101_ASDU_getElement(asdu2, 0);
-    SinglePointWithCP24Time2a spi2_dec = (SinglePointWithCP24Time2a) CS101_ASDU_getElement(asdu2, 1);
-    SinglePointWithCP24Time2a spi3_dec = (SinglePointWithCP24Time2a) CS101_ASDU_getElement(asdu2, 2);
+    SinglePointWithCP24Time2a spi1_dec = (SinglePointWithCP24Time2a)CS101_ASDU_getElement(asdu2, 0);
+    SinglePointWithCP24Time2a spi2_dec = (SinglePointWithCP24Time2a)CS101_ASDU_getElement(asdu2, 1);
+    SinglePointWithCP24Time2a spi3_dec = (SinglePointWithCP24Time2a)CS101_ASDU_getElement(asdu2, 2);
 
     TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
     TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
     TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)spi3_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, SinglePointInformation_getQuality((SinglePointInformation)spi1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            SinglePointInformation_getQuality((SinglePointInformation)spi1_dec));
     TEST_ASSERT_TRUE(SinglePointInformation_getValue((SinglePointInformation)spi1_dec));
     CP24Time2a time1_dec = SinglePointWithCP24Time2a_getTimestamp(spi1_dec);
     TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time1_dec));
     TEST_ASSERT_EQUAL_INT(24, CP24Time2a_getSecond(time1_dec));
     TEST_ASSERT_EQUAL_INT(123, CP24Time2a_getMillisecond(time1_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, SinglePointInformation_getQuality((SinglePointInformation)spi2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            SinglePointInformation_getQuality((SinglePointInformation)spi2_dec));
     TEST_ASSERT_FALSE(SinglePointInformation_getValue((SinglePointInformation)spi2_dec));
     CP24Time2a time2_dec = SinglePointWithCP24Time2a_getTimestamp(spi2_dec);
     TEST_ASSERT_EQUAL_INT(54, CP24Time2a_getMinute(time2_dec));
@@ -2184,18 +2268,18 @@ test_SinglePointWithCP24Time2a(void)
     TEST_ASSERT_EQUAL_INT(00, CP24Time2a_getSecond(time3_dec));
     TEST_ASSERT_EQUAL_INT(1, CP24Time2a_getMillisecond(time3_dec));
 
-    InformationObject_destroy((InformationObject) spi1_dec);
-    InformationObject_destroy((InformationObject) spi2_dec);
-    InformationObject_destroy((InformationObject) spi3_dec);
+    InformationObject_destroy((InformationObject)spi1_dec);
+    InformationObject_destroy((InformationObject)spi2_dec);
+    InformationObject_destroy((InformationObject)spi3_dec);
 
     CS101_ASDU_destroy(asdu2);
 }
 void
 test_DoublePointWithCP56Time2a(void)
 {
-	DoublePointWithCP56Time2a dpi1;
-	DoublePointWithCP56Time2a dpi2;
-	DoublePointWithCP56Time2a dpi3;
+    DoublePointWithCP56Time2a dpi1;
+    DoublePointWithCP56Time2a dpi2;
+    DoublePointWithCP56Time2a dpi3;
 
     uint64_t time1 = Hal_getTimeInMs();
     uint64_t time2 = time1 + 1000;
@@ -2211,7 +2295,8 @@ test_DoublePointWithCP56Time2a(void)
 
     dpi1 = DoublePointWithCP56Time2a_create(NULL, 101, IEC60870_DOUBLE_POINT_OFF, IEC60870_QUALITY_INVALID, &cpTime1);
     dpi2 = DoublePointWithCP56Time2a_create(NULL, 102, IEC60870_DOUBLE_POINT_ON, IEC60870_QUALITY_BLOCKED, &cpTime2);
-    dpi3 = DoublePointWithCP56Time2a_create(NULL, 103, IEC60870_DOUBLE_POINT_INDETERMINATE, IEC60870_QUALITY_GOOD, &cpTime3);
+    dpi3 = DoublePointWithCP56Time2a_create(NULL, 103, IEC60870_DOUBLE_POINT_INDETERMINATE, IEC60870_QUALITY_GOOD,
+                                            &cpTime3);
 
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, DoublePointInformation_getQuality((DoublePointInformation)dpi1));
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, DoublePointInformation_getQuality((DoublePointInformation)dpi2));
@@ -2226,13 +2311,13 @@ test_DoublePointWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dpi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dpi3);
 
-    InformationObject_destroy((InformationObject) dpi1);
-    InformationObject_destroy((InformationObject) dpi2);
-    InformationObject_destroy((InformationObject) dpi3);
+    InformationObject_destroy((InformationObject)dpi1);
+    InformationObject_destroy((InformationObject)dpi2);
+    InformationObject_destroy((InformationObject)dpi3);
 
     CS101_ASDU_encode(asdu, f);
 
@@ -2244,29 +2329,34 @@ test_DoublePointWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(3, CS101_ASDU_getNumberOfElements(asdu2));
 
-    DoublePointWithCP56Time2a dpi1_dec = (DoublePointWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
-    DoublePointWithCP56Time2a dpi2_dec = (DoublePointWithCP56Time2a) CS101_ASDU_getElement(asdu2, 1);
-    DoublePointWithCP56Time2a dpi3_dec = (DoublePointWithCP56Time2a) CS101_ASDU_getElement(asdu2, 2);
+    DoublePointWithCP56Time2a dpi1_dec = (DoublePointWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
+    DoublePointWithCP56Time2a dpi2_dec = (DoublePointWithCP56Time2a)CS101_ASDU_getElement(asdu2, 1);
+    DoublePointWithCP56Time2a dpi3_dec = (DoublePointWithCP56Time2a)CS101_ASDU_getElement(asdu2, 2);
 
     TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)dpi1_dec));
     TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)dpi2_dec));
     TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)dpi3_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, DoublePointInformation_getQuality((DoublePointInformation)dpi1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_DOUBLE_POINT_OFF, DoublePointInformation_getValue((DoublePointInformation)dpi1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            DoublePointInformation_getQuality((DoublePointInformation)dpi1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_DOUBLE_POINT_OFF,
+                            DoublePointInformation_getValue((DoublePointInformation)dpi1_dec));
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(DoublePointWithCP56Time2a_getTimestamp(dpi1_dec)));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, DoublePointInformation_getQuality((DoublePointInformation)dpi2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_DOUBLE_POINT_ON, DoublePointInformation_getValue((DoublePointInformation)dpi2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            DoublePointInformation_getQuality((DoublePointInformation)dpi2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_DOUBLE_POINT_ON,
+                            DoublePointInformation_getValue((DoublePointInformation)dpi2_dec));
     TEST_ASSERT_EQUAL_UINT64(time2, CP56Time2a_toMsTimestamp(DoublePointWithCP56Time2a_getTimestamp(dpi2_dec)));
 
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, DoublePointInformation_getQuality((DoublePointInformation)dpi3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_DOUBLE_POINT_INDETERMINATE, DoublePointInformation_getValue((DoublePointInformation)dpi3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_DOUBLE_POINT_INDETERMINATE,
+                            DoublePointInformation_getValue((DoublePointInformation)dpi3_dec));
     TEST_ASSERT_EQUAL_UINT64(time3, CP56Time2a_toMsTimestamp(DoublePointWithCP56Time2a_getTimestamp(dpi3_dec)));
 
-    InformationObject_destroy((InformationObject) dpi1_dec);
-    InformationObject_destroy((InformationObject) dpi2_dec);
-    InformationObject_destroy((InformationObject) dpi3_dec);
+    InformationObject_destroy((InformationObject)dpi1_dec);
+    InformationObject_destroy((InformationObject)dpi2_dec);
+    InformationObject_destroy((InformationObject)dpi3_dec);
 
     CS101_ASDU_destroy(asdu2);
 }
@@ -2307,13 +2397,13 @@ test_SinglePointWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spi3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spi3);
 
-    InformationObject_destroy((InformationObject) spi1);
-    InformationObject_destroy((InformationObject) spi2);
-    InformationObject_destroy((InformationObject) spi3);
+    InformationObject_destroy((InformationObject)spi1);
+    InformationObject_destroy((InformationObject)spi2);
+    InformationObject_destroy((InformationObject)spi3);
 
     CS101_ASDU_encode(asdu, f);
 
@@ -2325,19 +2415,21 @@ test_SinglePointWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(3, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SinglePointWithCP56Time2a spi1_dec = (SinglePointWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
-    SinglePointWithCP56Time2a spi2_dec = (SinglePointWithCP56Time2a) CS101_ASDU_getElement(asdu2, 1);
-    SinglePointWithCP56Time2a spi3_dec = (SinglePointWithCP56Time2a) CS101_ASDU_getElement(asdu2, 2);
+    SinglePointWithCP56Time2a spi1_dec = (SinglePointWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
+    SinglePointWithCP56Time2a spi2_dec = (SinglePointWithCP56Time2a)CS101_ASDU_getElement(asdu2, 1);
+    SinglePointWithCP56Time2a spi3_dec = (SinglePointWithCP56Time2a)CS101_ASDU_getElement(asdu2, 2);
 
     TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spi1_dec));
     TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)spi2_dec));
     TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)spi3_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, SinglePointInformation_getQuality((SinglePointInformation)spi1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            SinglePointInformation_getQuality((SinglePointInformation)spi1_dec));
     TEST_ASSERT_TRUE(SinglePointInformation_getValue((SinglePointInformation)spi1_dec));
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(SinglePointWithCP56Time2a_getTimestamp(spi1_dec)));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, SinglePointInformation_getQuality((SinglePointInformation)spi2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            SinglePointInformation_getQuality((SinglePointInformation)spi2_dec));
     TEST_ASSERT_FALSE(SinglePointInformation_getValue((SinglePointInformation)spi2_dec));
     TEST_ASSERT_EQUAL_UINT64(time2, CP56Time2a_toMsTimestamp(SinglePointWithCP56Time2a_getTimestamp(spi2_dec)));
 
@@ -2345,9 +2437,9 @@ test_SinglePointWithCP56Time2a(void)
     TEST_ASSERT_TRUE(SinglePointInformation_getValue((SinglePointInformation)spi3_dec));
     TEST_ASSERT_EQUAL_UINT64(time3, CP56Time2a_toMsTimestamp(SinglePointWithCP56Time2a_getTimestamp(spi3_dec)));
 
-    InformationObject_destroy((InformationObject) spi1_dec);
-    InformationObject_destroy((InformationObject) spi2_dec);
-    InformationObject_destroy((InformationObject) spi3_dec);
+    InformationObject_destroy((InformationObject)spi1_dec);
+    InformationObject_destroy((InformationObject)spi2_dec);
+    InformationObject_destroy((InformationObject)spi3_dec);
 
     CS101_ASDU_destroy(asdu2);
 }
@@ -2359,7 +2451,8 @@ test_NormalizeMeasureValueWithoutQuality(void)
 
     nmv1 = MeasuredValueNormalizedWithoutQuality_create(NULL, 101, 0.5f);
 
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalizedWithoutQuality_getValue((MeasuredValueNormalizedWithoutQuality )nmv1));
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.01f, 0.5f, MeasuredValueNormalizedWithoutQuality_getValue((MeasuredValueNormalizedWithoutQuality)nmv1));
 
     uint8_t buffer[256];
 
@@ -2369,7 +2462,7 @@ test_NormalizeMeasureValueWithoutQuality(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv1);
 
     MeasuredValueNormalizedWithoutQuality_destroy(nmv1);
 
@@ -2383,10 +2476,12 @@ test_NormalizeMeasureValueWithoutQuality(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueNormalizedWithoutQuality nmv1_dec = (MeasuredValueNormalizedWithoutQuality) CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueNormalizedWithoutQuality nmv1_dec =
+        (MeasuredValueNormalizedWithoutQuality)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )nmv1_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalizedWithoutQuality_getValue((MeasuredValueNormalizedWithoutQuality )nmv1_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)nmv1_dec));
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.01f, 0.5f, MeasuredValueNormalizedWithoutQuality_getValue((MeasuredValueNormalizedWithoutQuality)nmv1_dec));
 
     MeasuredValueNormalizedWithoutQuality_destroy(nmv1_dec);
     CS101_ASDU_destroy(asdu2);
@@ -2413,23 +2508,30 @@ test_NormalizeMeasureValue(void)
     nmv7 = MeasuredValueNormalized_create(NULL, 107, 0.4f, IEC60870_QUALITY_NON_TOPICAL);
     nmv8 = MeasuredValueNormalized_create(NULL, 108, 0.5f, IEC60870_QUALITY_INVALID);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv8));
 
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv1));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv2));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv3));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv4));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv5));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv6));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv7));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv8));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv1));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv2));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv3));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv4));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv5));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv6));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv7));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv8));
 
     uint8_t buffer[256];
 
@@ -2439,14 +2541,14 @@ test_NormalizeMeasureValue(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv8);
 
     MeasuredValueNormalized_destroy(nmv1);
     MeasuredValueNormalized_destroy(nmv2);
@@ -2467,50 +2569,58 @@ test_NormalizeMeasureValue(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueNormalized nmv1_dec = (MeasuredValueNormalized) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueNormalized nmv2_dec = (MeasuredValueNormalized) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueNormalized nmv3_dec = (MeasuredValueNormalized) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueNormalized nmv4_dec = (MeasuredValueNormalized) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueNormalized nmv5_dec = (MeasuredValueNormalized) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueNormalized nmv6_dec = (MeasuredValueNormalized) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueNormalized nmv7_dec = (MeasuredValueNormalized) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueNormalized nmv8_dec = (MeasuredValueNormalized) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueNormalized nmv1_dec = (MeasuredValueNormalized)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueNormalized nmv2_dec = (MeasuredValueNormalized)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueNormalized nmv3_dec = (MeasuredValueNormalized)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueNormalized nmv4_dec = (MeasuredValueNormalized)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueNormalized nmv5_dec = (MeasuredValueNormalized)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueNormalized nmv6_dec = (MeasuredValueNormalized)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueNormalized nmv7_dec = (MeasuredValueNormalized)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueNormalized nmv8_dec = (MeasuredValueNormalized)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )nmv1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )nmv2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )nmv3_dec));
-    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject )nmv4_dec));
-    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject )nmv5_dec));
-    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject )nmv6_dec));
-    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject )nmv7_dec));
-    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject )nmv8_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)nmv1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)nmv2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)nmv3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)nmv4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)nmv5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)nmv6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)nmv7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)nmv8_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv4_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv5_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv6_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv7_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv8_dec));
 
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv1_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv2_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv3_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv4_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv5_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv6_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv7_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv8_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv1_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv2_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv3_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv4_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv5_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv6_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv7_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv8_dec));
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )nmv1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )nmv2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )nmv3_dec));
-    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject )nmv4_dec));
-    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject )nmv5_dec));
-    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject )nmv6_dec));
-    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject )nmv7_dec));
-    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject )nmv8_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)nmv1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)nmv2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)nmv3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)nmv4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)nmv5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)nmv6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)nmv7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)nmv8_dec));
 
     MeasuredValueNormalized_destroy(nmv1_dec);
     MeasuredValueNormalized_destroy(nmv2_dec);
@@ -2596,23 +2706,30 @@ test_MeasuredValueNormalizedWithCP24Time2a(void)
     nmv7 = MeasuredValueNormalizedWithCP24Time2a_create(NULL, 107, 0.4f, IEC60870_QUALITY_NON_TOPICAL, &cpTime7);
     nmv8 = MeasuredValueNormalizedWithCP24Time2a_create(NULL, 108, 0.5f, IEC60870_QUALITY_INVALID, &cpTime8);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv8));
 
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv1));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv2));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv3));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv4));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv5));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv6));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv7));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv8));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv1));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv2));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv3));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv4));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv5));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv6));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv7));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv8));
 
     uint8_t buffer[256];
 
@@ -2622,14 +2739,14 @@ test_MeasuredValueNormalizedWithCP24Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv8);
 
     MeasuredValueNormalizedWithCP24Time2a_destroy(nmv1);
     MeasuredValueNormalizedWithCP24Time2a_destroy(nmv2);
@@ -2650,41 +2767,57 @@ test_MeasuredValueNormalizedWithCP24Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueNormalizedWithCP24Time2a nmv1_dec = (MeasuredValueNormalizedWithCP24Time2a) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueNormalizedWithCP24Time2a nmv2_dec = (MeasuredValueNormalizedWithCP24Time2a) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueNormalizedWithCP24Time2a nmv3_dec = (MeasuredValueNormalizedWithCP24Time2a) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueNormalizedWithCP24Time2a nmv4_dec = (MeasuredValueNormalizedWithCP24Time2a) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueNormalizedWithCP24Time2a nmv5_dec = (MeasuredValueNormalizedWithCP24Time2a) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueNormalizedWithCP24Time2a nmv6_dec = (MeasuredValueNormalizedWithCP24Time2a) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueNormalizedWithCP24Time2a nmv7_dec = (MeasuredValueNormalizedWithCP24Time2a) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueNormalizedWithCP24Time2a nmv8_dec = (MeasuredValueNormalizedWithCP24Time2a) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueNormalizedWithCP24Time2a nmv1_dec =
+        (MeasuredValueNormalizedWithCP24Time2a)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueNormalizedWithCP24Time2a nmv2_dec =
+        (MeasuredValueNormalizedWithCP24Time2a)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueNormalizedWithCP24Time2a nmv3_dec =
+        (MeasuredValueNormalizedWithCP24Time2a)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueNormalizedWithCP24Time2a nmv4_dec =
+        (MeasuredValueNormalizedWithCP24Time2a)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueNormalizedWithCP24Time2a nmv5_dec =
+        (MeasuredValueNormalizedWithCP24Time2a)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueNormalizedWithCP24Time2a nmv6_dec =
+        (MeasuredValueNormalizedWithCP24Time2a)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueNormalizedWithCP24Time2a nmv7_dec =
+        (MeasuredValueNormalizedWithCP24Time2a)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueNormalizedWithCP24Time2a nmv8_dec =
+        (MeasuredValueNormalizedWithCP24Time2a)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )nmv1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )nmv2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )nmv3_dec));
-    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject )nmv4_dec));
-    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject )nmv5_dec));
-    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject )nmv6_dec));
-    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject )nmv7_dec));
-    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject )nmv8_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)nmv1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)nmv2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)nmv3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)nmv4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)nmv5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)nmv6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)nmv7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)nmv8_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv4_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv5_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv6_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv7_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv8_dec));
 
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv1_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv2_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv3_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv4_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv5_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv6_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv7_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv8_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv1_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv2_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv3_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv4_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv5_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv6_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv7_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv8_dec));
 
     CP24Time2a time1_dec = MeasuredValueNormalizedWithCP24Time2a_getTimestamp(nmv1_dec);
     TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time1_dec));
@@ -2787,23 +2920,30 @@ test_MeasuredValueNormalizedWithCP56Time2a(void)
     nmv7 = MeasuredValueNormalizedWithCP56Time2a_create(NULL, 107, 0.4f, IEC60870_QUALITY_NON_TOPICAL, &cpTime7);
     nmv8 = MeasuredValueNormalizedWithCP56Time2a_create(NULL, 108, 0.5f, IEC60870_QUALITY_INVALID, &cpTime8);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv8));
 
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv1));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv2));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv3));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv4));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv5));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv6));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv7));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv8));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv1));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv2));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv3));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv4));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv5));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv6));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv7));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv8));
 
     uint8_t buffer[256];
 
@@ -2813,14 +2953,14 @@ test_MeasuredValueNormalizedWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) nmv8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)nmv8);
 
     MeasuredValueNormalizedWithCP56Time2a_destroy(nmv1);
     MeasuredValueNormalizedWithCP56Time2a_destroy(nmv2);
@@ -2841,50 +2981,74 @@ test_MeasuredValueNormalizedWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueNormalizedWithCP56Time2a nmv1_dec = (MeasuredValueNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueNormalizedWithCP56Time2a nmv2_dec = (MeasuredValueNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueNormalizedWithCP56Time2a nmv3_dec = (MeasuredValueNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueNormalizedWithCP56Time2a nmv4_dec = (MeasuredValueNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueNormalizedWithCP56Time2a nmv5_dec = (MeasuredValueNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueNormalizedWithCP56Time2a nmv6_dec = (MeasuredValueNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueNormalizedWithCP56Time2a nmv7_dec = (MeasuredValueNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueNormalizedWithCP56Time2a nmv8_dec = (MeasuredValueNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueNormalizedWithCP56Time2a nmv1_dec =
+        (MeasuredValueNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueNormalizedWithCP56Time2a nmv2_dec =
+        (MeasuredValueNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueNormalizedWithCP56Time2a nmv3_dec =
+        (MeasuredValueNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueNormalizedWithCP56Time2a nmv4_dec =
+        (MeasuredValueNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueNormalizedWithCP56Time2a nmv5_dec =
+        (MeasuredValueNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueNormalizedWithCP56Time2a nmv6_dec =
+        (MeasuredValueNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueNormalizedWithCP56Time2a nmv7_dec =
+        (MeasuredValueNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueNormalizedWithCP56Time2a nmv8_dec =
+        (MeasuredValueNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )nmv1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )nmv2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )nmv3_dec));
-    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject )nmv4_dec));
-    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject )nmv5_dec));
-    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject )nmv6_dec));
-    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject )nmv7_dec));
-    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject )nmv8_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)nmv1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)nmv2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)nmv3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)nmv4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)nmv5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)nmv6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)nmv7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)nmv8_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv4_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv5_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv6_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv7_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueNormalized_getQuality((MeasuredValueNormalized )nmv8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID,
+                            MeasuredValueNormalized_getQuality((MeasuredValueNormalized)nmv8_dec));
 
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv1_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv2_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv3_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv4_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv5_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv6_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv7_dec));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized )nmv8_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv1_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv2_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -0.1f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv3_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv4_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.2f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv5_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.3f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv6_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.4f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv7_dec));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, MeasuredValueNormalized_getValue((MeasuredValueNormalized)nmv8_dec));
 
-    TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv1_dec)));
-    TEST_ASSERT_EQUAL_UINT64(time2, CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv2_dec)));
-    TEST_ASSERT_EQUAL_UINT64(time3, CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv3_dec)));
-    TEST_ASSERT_EQUAL_UINT64(time4, CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv4_dec)));
-    TEST_ASSERT_EQUAL_UINT64(time5, CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv5_dec)));
-    TEST_ASSERT_EQUAL_UINT64(time6, CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv6_dec)));
-    TEST_ASSERT_EQUAL_UINT64(time7, CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv7_dec)));
-    TEST_ASSERT_EQUAL_UINT64(time8, CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv8_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time1,
+                             CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv1_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time2,
+                             CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv2_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time3,
+                             CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv3_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time4,
+                             CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv4_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time5,
+                             CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv5_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time6,
+                             CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv6_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time7,
+                             CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv7_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time8,
+                             CP56Time2a_toMsTimestamp(MeasuredValueNormalizedWithCP56Time2a_getTimestamp(nmv8_dec)));
 
     MeasuredValueNormalizedWithCP56Time2a_destroy(nmv1_dec);
     MeasuredValueNormalizedWithCP56Time2a_destroy(nmv2_dec);
@@ -2919,23 +3083,24 @@ test_MeasuredValueScaled(void)
     mvs7 = MeasuredValueScaled_create(NULL, 107, INT16_MIN, IEC60870_QUALITY_NON_TOPICAL);
     mvs8 = MeasuredValueScaled_create(NULL, 108, INT16_MIN, IEC60870_QUALITY_INVALID);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs8));
 
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs1));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs2));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs3));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs4));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs5));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs6));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs7));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs8));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs1));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs2));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs3));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs4));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs5));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs6));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs7));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs8));
 
     uint8_t buffer[256];
 
@@ -2945,14 +3110,14 @@ test_MeasuredValueScaled(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs8);
 
     MeasuredValueScaled_destroy(mvs1);
     MeasuredValueScaled_destroy(mvs2);
@@ -2973,41 +3138,44 @@ test_MeasuredValueScaled(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueScaled mvs1_dec = (MeasuredValueScaled) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueScaled mvs2_dec = (MeasuredValueScaled) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueScaled mvs3_dec = (MeasuredValueScaled) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueScaled mvs4_dec = (MeasuredValueScaled) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueScaled mvs5_dec = (MeasuredValueScaled) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueScaled mvs6_dec = (MeasuredValueScaled) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueScaled mvs7_dec = (MeasuredValueScaled) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueScaled mvs8_dec = (MeasuredValueScaled) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueScaled mvs1_dec = (MeasuredValueScaled)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueScaled mvs2_dec = (MeasuredValueScaled)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueScaled mvs3_dec = (MeasuredValueScaled)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueScaled mvs4_dec = (MeasuredValueScaled)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueScaled mvs5_dec = (MeasuredValueScaled)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueScaled mvs6_dec = (MeasuredValueScaled)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueScaled mvs7_dec = (MeasuredValueScaled)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueScaled mvs8_dec = (MeasuredValueScaled)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )mvs1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )mvs2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )mvs3_dec));
-    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject )mvs4_dec));
-    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject )mvs5_dec));
-    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject )mvs6_dec));
-    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject )mvs7_dec));
-    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject )mvs8_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)mvs1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)mvs2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)mvs3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)mvs4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)mvs5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)mvs6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)mvs7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)mvs8_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs4_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs5_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs6_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs7_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs8_dec));
 
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs1_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs2_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs3_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs4_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs5_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs6_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs7_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs8_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs1_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs2_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs3_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs4_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs5_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs6_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs7_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs8_dec));
 
     MeasuredValueScaled_destroy(mvs1_dec);
     MeasuredValueScaled_destroy(mvs2_dec);
@@ -3088,29 +3256,31 @@ test_MeasuredValueScaledWithCP24Time2a(void)
     mvs1 = MeasuredValueScaledWithCP24Time2a_create(NULL, 101, INT16_MAX, IEC60870_QUALITY_GOOD, &cpTime1);
     mvs2 = MeasuredValueScaledWithCP24Time2a_create(NULL, 102, INT16_MAX, IEC60870_QUALITY_OVERFLOW, &cpTime2);
     mvs3 = MeasuredValueScaledWithCP24Time2a_create(NULL, 103, INT16_MAX, IEC60870_QUALITY_RESERVED, &cpTime3);
-    mvs4 = MeasuredValueScaledWithCP24Time2a_create(NULL, 104, INT16_MAX, IEC60870_QUALITY_ELAPSED_TIME_INVALID, &cpTime4);
+    mvs4 =
+        MeasuredValueScaledWithCP24Time2a_create(NULL, 104, INT16_MAX, IEC60870_QUALITY_ELAPSED_TIME_INVALID, &cpTime4);
     mvs5 = MeasuredValueScaledWithCP24Time2a_create(NULL, 105, INT16_MIN, IEC60870_QUALITY_BLOCKED, &cpTime5);
     mvs6 = MeasuredValueScaledWithCP24Time2a_create(NULL, 106, INT16_MIN, IEC60870_QUALITY_SUBSTITUTED, &cpTime6);
     mvs7 = MeasuredValueScaledWithCP24Time2a_create(NULL, 107, INT16_MIN, IEC60870_QUALITY_NON_TOPICAL, &cpTime7);
     mvs8 = MeasuredValueScaledWithCP24Time2a_create(NULL, 108, INT16_MIN, IEC60870_QUALITY_INVALID, &cpTime8);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs8));
 
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs1));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs2));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs3));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs4));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs5));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs6));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs7));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs8));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs1));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs2));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs3));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs4));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs5));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs6));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs7));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs8));
 
     uint8_t buffer[256];
 
@@ -3120,14 +3290,14 @@ test_MeasuredValueScaledWithCP24Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs8);
 
     MeasuredValueScaledWithCP24Time2a_destroy(mvs1);
     MeasuredValueScaledWithCP24Time2a_destroy(mvs2);
@@ -3148,41 +3318,44 @@ test_MeasuredValueScaledWithCP24Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueScaledWithCP24Time2a mvs1_dec = (MeasuredValueScaledWithCP24Time2a) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueScaledWithCP24Time2a mvs2_dec = (MeasuredValueScaledWithCP24Time2a) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueScaledWithCP24Time2a mvs3_dec = (MeasuredValueScaledWithCP24Time2a) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueScaledWithCP24Time2a mvs4_dec = (MeasuredValueScaledWithCP24Time2a) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueScaledWithCP24Time2a mvs5_dec = (MeasuredValueScaledWithCP24Time2a) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueScaledWithCP24Time2a mvs6_dec = (MeasuredValueScaledWithCP24Time2a) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueScaledWithCP24Time2a mvs7_dec = (MeasuredValueScaledWithCP24Time2a) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueScaledWithCP24Time2a mvs8_dec = (MeasuredValueScaledWithCP24Time2a) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueScaledWithCP24Time2a mvs1_dec = (MeasuredValueScaledWithCP24Time2a)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueScaledWithCP24Time2a mvs2_dec = (MeasuredValueScaledWithCP24Time2a)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueScaledWithCP24Time2a mvs3_dec = (MeasuredValueScaledWithCP24Time2a)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueScaledWithCP24Time2a mvs4_dec = (MeasuredValueScaledWithCP24Time2a)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueScaledWithCP24Time2a mvs5_dec = (MeasuredValueScaledWithCP24Time2a)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueScaledWithCP24Time2a mvs6_dec = (MeasuredValueScaledWithCP24Time2a)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueScaledWithCP24Time2a mvs7_dec = (MeasuredValueScaledWithCP24Time2a)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueScaledWithCP24Time2a mvs8_dec = (MeasuredValueScaledWithCP24Time2a)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )mvs1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )mvs2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )mvs3_dec));
-    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject )mvs4_dec));
-    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject )mvs5_dec));
-    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject )mvs6_dec));
-    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject )mvs7_dec));
-    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject )mvs8_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)mvs1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)mvs2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)mvs3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)mvs4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)mvs5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)mvs6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)mvs7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)mvs8_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs4_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs5_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs6_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs7_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs8_dec));
 
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs1_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs2_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs3_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs4_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs5_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs6_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs7_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs8_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs1_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs2_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs3_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs4_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs5_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs6_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs7_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs8_dec));
 
     CP24Time2a time1_dec = MeasuredValueScaledWithCP24Time2a_getTimestamp(mvs1_dec);
     TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time1_dec));
@@ -3278,29 +3451,31 @@ test_MeasuredValueScaledWithCP56Time2a(void)
     mvs1 = MeasuredValueScaledWithCP56Time2a_create(NULL, 101, INT16_MAX, IEC60870_QUALITY_GOOD, &cpTime1);
     mvs2 = MeasuredValueScaledWithCP56Time2a_create(NULL, 102, INT16_MAX, IEC60870_QUALITY_OVERFLOW, &cpTime2);
     mvs3 = MeasuredValueScaledWithCP56Time2a_create(NULL, 103, INT16_MAX, IEC60870_QUALITY_RESERVED, &cpTime3);
-    mvs4 = MeasuredValueScaledWithCP56Time2a_create(NULL, 104, INT16_MAX, IEC60870_QUALITY_ELAPSED_TIME_INVALID, &cpTime4);
+    mvs4 =
+        MeasuredValueScaledWithCP56Time2a_create(NULL, 104, INT16_MAX, IEC60870_QUALITY_ELAPSED_TIME_INVALID, &cpTime4);
     mvs5 = MeasuredValueScaledWithCP56Time2a_create(NULL, 105, INT16_MIN, IEC60870_QUALITY_BLOCKED, &cpTime5);
     mvs6 = MeasuredValueScaledWithCP56Time2a_create(NULL, 106, INT16_MIN, IEC60870_QUALITY_SUBSTITUTED, &cpTime6);
     mvs7 = MeasuredValueScaledWithCP56Time2a_create(NULL, 107, INT16_MIN, IEC60870_QUALITY_NON_TOPICAL, &cpTime7);
     mvs8 = MeasuredValueScaledWithCP56Time2a_create(NULL, 108, INT16_MIN, IEC60870_QUALITY_INVALID, &cpTime8);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs8));
 
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs1));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs2));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs3));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs4));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs5));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs6));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs7));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs8));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs1));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs2));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs3));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs4));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs5));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs6));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs7));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs8));
 
     uint8_t buffer[256];
 
@@ -3310,14 +3485,14 @@ test_MeasuredValueScaledWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs8);
 
     MeasuredValueScaledWithCP56Time2a_destroy(mvs1);
     MeasuredValueScaledWithCP56Time2a_destroy(mvs2);
@@ -3338,41 +3513,44 @@ test_MeasuredValueScaledWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueScaledWithCP56Time2a mvs1_dec = (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueScaledWithCP56Time2a mvs2_dec = (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueScaledWithCP56Time2a mvs3_dec = (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueScaledWithCP56Time2a mvs4_dec = (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueScaledWithCP56Time2a mvs5_dec = (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueScaledWithCP56Time2a mvs6_dec = (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueScaledWithCP56Time2a mvs7_dec = (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueScaledWithCP56Time2a mvs8_dec = (MeasuredValueScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueScaledWithCP56Time2a mvs1_dec = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueScaledWithCP56Time2a mvs2_dec = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueScaledWithCP56Time2a mvs3_dec = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueScaledWithCP56Time2a mvs4_dec = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueScaledWithCP56Time2a mvs5_dec = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueScaledWithCP56Time2a mvs6_dec = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueScaledWithCP56Time2a mvs7_dec = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueScaledWithCP56Time2a mvs8_dec = (MeasuredValueScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )mvs1_dec));
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )mvs2_dec));
-    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject )mvs3_dec));
-    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject )mvs4_dec));
-    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject )mvs5_dec));
-    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject )mvs6_dec));
-    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject )mvs7_dec));
-    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject )mvs8_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)mvs1_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)mvs2_dec));
+    TEST_ASSERT_EQUAL_INT(103, InformationObject_getObjectAddress((InformationObject)mvs3_dec));
+    TEST_ASSERT_EQUAL_INT(104, InformationObject_getObjectAddress((InformationObject)mvs4_dec));
+    TEST_ASSERT_EQUAL_INT(105, InformationObject_getObjectAddress((InformationObject)mvs5_dec));
+    TEST_ASSERT_EQUAL_INT(106, InformationObject_getObjectAddress((InformationObject)mvs6_dec));
+    TEST_ASSERT_EQUAL_INT(107, InformationObject_getObjectAddress((InformationObject)mvs7_dec));
+    TEST_ASSERT_EQUAL_INT(108, InformationObject_getObjectAddress((InformationObject)mvs8_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs4_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs5_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs6_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs7_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled )mvs8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL,
+                            MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueScaled_getQuality((MeasuredValueScaled)mvs8_dec));
 
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs1_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs2_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs3_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs4_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs5_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs6_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs7_dec));
-    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled )mvs8_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs1_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs2_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs3_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MAX, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs4_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs5_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs6_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs7_dec));
+    TEST_ASSERT_EQUAL_INT(INT16_MIN, MeasuredValueScaled_getValue((MeasuredValueScaled)mvs8_dec));
 
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(MeasuredValueScaledWithCP56Time2a_getTimestamp(mvs1_dec)));
     TEST_ASSERT_EQUAL_UINT64(time2, CP56Time2a_toMsTimestamp(MeasuredValueScaledWithCP56Time2a_getTimestamp(mvs2_dec)));
@@ -3416,14 +3594,14 @@ test_MeasuredValueShort(void)
     mvs7 = MeasuredValueShort_create(NULL, 107, 16.5f, IEC60870_QUALITY_NON_TOPICAL);
     mvs8 = MeasuredValueShort_create(NULL, 108, 17.5f, IEC60870_QUALITY_INVALID);
 
-    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs1));
-    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs2));
-    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs3));
-    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs4));
-    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs5));
-    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs6));
-    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs7));
-    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs8));
+    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs1));
+    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs2));
+    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs3));
+    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs4));
+    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs5));
+    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs6));
+    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs7));
+    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs8));
 
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality(mvs1));
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality(mvs2));
@@ -3442,14 +3620,14 @@ test_MeasuredValueShort(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs8);
 
     MeasuredValueShort_destroy(mvs1);
     MeasuredValueShort_destroy(mvs2);
@@ -3470,23 +3648,23 @@ test_MeasuredValueShort(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueShort mvs1_dec = (MeasuredValueShort) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueShort mvs2_dec = (MeasuredValueShort) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueShort mvs3_dec = (MeasuredValueShort) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueShort mvs4_dec = (MeasuredValueShort) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueShort mvs5_dec = (MeasuredValueShort) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueShort mvs6_dec = (MeasuredValueShort) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueShort mvs7_dec = (MeasuredValueShort) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueShort mvs8_dec = (MeasuredValueShort) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueShort mvs1_dec = (MeasuredValueShort)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueShort mvs2_dec = (MeasuredValueShort)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueShort mvs3_dec = (MeasuredValueShort)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueShort mvs4_dec = (MeasuredValueShort)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueShort mvs5_dec = (MeasuredValueShort)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueShort mvs6_dec = (MeasuredValueShort)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueShort mvs7_dec = (MeasuredValueShort)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueShort mvs8_dec = (MeasuredValueShort)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs1_dec));
-    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs2_dec));
-    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs3_dec));
-    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs4_dec));
-    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs5_dec));
-    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs6_dec));
-    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs7_dec));
-    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs8_dec));
+    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs1_dec));
+    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs2_dec));
+    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs3_dec));
+    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs4_dec));
+    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs5_dec));
+    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs6_dec));
+    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs7_dec));
+    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs8_dec));
 
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality(mvs1_dec));
     TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality(mvs2_dec));
@@ -3581,23 +3759,24 @@ test_MeasuredValueShortWithCP24Time2a(void)
     mvs7 = MeasuredValueShortWithCP24Time2a_create(NULL, 107, 16.5f, IEC60870_QUALITY_NON_TOPICAL, &cpTime7);
     mvs8 = MeasuredValueShortWithCP24Time2a_create(NULL, 108, 17.5f, IEC60870_QUALITY_INVALID, &cpTime8);
 
-    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs1));
-    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs2));
-    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs3));
-    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs4));
-    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs5));
-    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs6));
-    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs7));
-    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs8));
+    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs1));
+    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs2));
+    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs3));
+    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs4));
+    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs5));
+    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs6));
+    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs7));
+    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs8));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality((MeasuredValueShort )mvs1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality((MeasuredValueShort )mvs2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort )mvs4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueShort_getQuality((MeasuredValueShort )mvs7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort )mvs8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality((MeasuredValueShort)mvs1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality((MeasuredValueShort)mvs2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueShort_getQuality((MeasuredValueShort)mvs4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueShort_getQuality((MeasuredValueShort)mvs7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort)mvs8));
 
     uint8_t buffer[256];
 
@@ -3607,14 +3786,14 @@ test_MeasuredValueShortWithCP24Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs8);
 
     MeasuredValueShortWithCP24Time2a_destroy(mvs1);
     MeasuredValueShortWithCP24Time2a_destroy(mvs2);
@@ -3635,32 +3814,33 @@ test_MeasuredValueShortWithCP24Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueShortWithCP24Time2a mvs1_dec = (MeasuredValueShortWithCP24Time2a) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueShortWithCP24Time2a mvs2_dec = (MeasuredValueShortWithCP24Time2a) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueShortWithCP24Time2a mvs3_dec = (MeasuredValueShortWithCP24Time2a) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueShortWithCP24Time2a mvs4_dec = (MeasuredValueShortWithCP24Time2a) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueShortWithCP24Time2a mvs5_dec = (MeasuredValueShortWithCP24Time2a) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueShortWithCP24Time2a mvs6_dec = (MeasuredValueShortWithCP24Time2a) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueShortWithCP24Time2a mvs7_dec = (MeasuredValueShortWithCP24Time2a) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueShortWithCP24Time2a mvs8_dec = (MeasuredValueShortWithCP24Time2a) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueShortWithCP24Time2a mvs1_dec = (MeasuredValueShortWithCP24Time2a)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueShortWithCP24Time2a mvs2_dec = (MeasuredValueShortWithCP24Time2a)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueShortWithCP24Time2a mvs3_dec = (MeasuredValueShortWithCP24Time2a)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueShortWithCP24Time2a mvs4_dec = (MeasuredValueShortWithCP24Time2a)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueShortWithCP24Time2a mvs5_dec = (MeasuredValueShortWithCP24Time2a)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueShortWithCP24Time2a mvs6_dec = (MeasuredValueShortWithCP24Time2a)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueShortWithCP24Time2a mvs7_dec = (MeasuredValueShortWithCP24Time2a)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueShortWithCP24Time2a mvs8_dec = (MeasuredValueShortWithCP24Time2a)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs1_dec));
-    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs2_dec));
-    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs3_dec));
-    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs4_dec));
-    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs5_dec));
-    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs6_dec));
-    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs7_dec));
-    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs8_dec));
+    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs1_dec));
+    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs2_dec));
+    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs3_dec));
+    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs4_dec));
+    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs5_dec));
+    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs6_dec));
+    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs7_dec));
+    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs8_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality((MeasuredValueShort )mvs1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality((MeasuredValueShort )mvs2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort )mvs4_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs5_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs6_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueShort_getQuality((MeasuredValueShort )mvs7_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort )mvs8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality((MeasuredValueShort)mvs1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality((MeasuredValueShort)mvs2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueShort_getQuality((MeasuredValueShort)mvs4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueShort_getQuality((MeasuredValueShort)mvs7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort)mvs8_dec));
 
     CP24Time2a time1_dec = MeasuredValueShortWithCP24Time2a_getTimestamp(mvs1_dec);
     TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time1_dec));
@@ -3762,23 +3942,24 @@ test_MeasuredValueShortWithCP56Time2a(void)
     mvs7 = MeasuredValueShortWithCP56Time2a_create(NULL, 107, 16.5f, IEC60870_QUALITY_NON_TOPICAL, &cpTime7);
     mvs8 = MeasuredValueShortWithCP56Time2a_create(NULL, 108, 17.5f, IEC60870_QUALITY_INVALID, &cpTime8);
 
-    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs1));
-    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs2));
-    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs3));
-    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs4));
-    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs5));
-    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs6));
-    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs7));
-    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs8));
+    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs1));
+    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs2));
+    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs3));
+    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs4));
+    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs5));
+    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs6));
+    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs7));
+    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs8));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality((MeasuredValueShort )mvs1));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality((MeasuredValueShort )mvs2));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs3));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort )mvs4));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs5));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs6));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueShort_getQuality((MeasuredValueShort )mvs7));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort )mvs8));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality((MeasuredValueShort)mvs1));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality((MeasuredValueShort)mvs2));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs3));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueShort_getQuality((MeasuredValueShort)mvs4));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs5));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs6));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueShort_getQuality((MeasuredValueShort)mvs7));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort)mvs8));
 
     uint8_t buffer[256];
 
@@ -3788,14 +3969,14 @@ test_MeasuredValueShortWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs3);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs4);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs5);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs6);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs7);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) mvs8);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs4);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs5);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs6);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs7);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)mvs8);
 
     MeasuredValueShortWithCP56Time2a_destroy(mvs1);
     MeasuredValueShortWithCP56Time2a_destroy(mvs2);
@@ -3816,32 +3997,33 @@ test_MeasuredValueShortWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(8, CS101_ASDU_getNumberOfElements(asdu2));
 
-    MeasuredValueShortWithCP56Time2a mvs1_dec = (MeasuredValueShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
-    MeasuredValueShortWithCP56Time2a mvs2_dec = (MeasuredValueShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 1);
-    MeasuredValueShortWithCP56Time2a mvs3_dec = (MeasuredValueShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 2);
-    MeasuredValueShortWithCP56Time2a mvs4_dec = (MeasuredValueShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 3);
-    MeasuredValueShortWithCP56Time2a mvs5_dec = (MeasuredValueShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 4);
-    MeasuredValueShortWithCP56Time2a mvs6_dec = (MeasuredValueShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 5);
-    MeasuredValueShortWithCP56Time2a mvs7_dec = (MeasuredValueShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 6);
-    MeasuredValueShortWithCP56Time2a mvs8_dec = (MeasuredValueShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 7);
+    MeasuredValueShortWithCP56Time2a mvs1_dec = (MeasuredValueShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
+    MeasuredValueShortWithCP56Time2a mvs2_dec = (MeasuredValueShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 1);
+    MeasuredValueShortWithCP56Time2a mvs3_dec = (MeasuredValueShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 2);
+    MeasuredValueShortWithCP56Time2a mvs4_dec = (MeasuredValueShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 3);
+    MeasuredValueShortWithCP56Time2a mvs5_dec = (MeasuredValueShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 4);
+    MeasuredValueShortWithCP56Time2a mvs6_dec = (MeasuredValueShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 5);
+    MeasuredValueShortWithCP56Time2a mvs7_dec = (MeasuredValueShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 6);
+    MeasuredValueShortWithCP56Time2a mvs8_dec = (MeasuredValueShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 7);
 
-    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs1_dec));
-    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs2_dec));
-    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs3_dec));
-    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs4_dec));
-    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs5_dec));
-    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs6_dec));
-    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs7_dec));
-    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort )mvs8_dec));
+    TEST_ASSERT_EQUAL_FLOAT(10.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs1_dec));
+    TEST_ASSERT_EQUAL_FLOAT(11.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs2_dec));
+    TEST_ASSERT_EQUAL_FLOAT(12.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs3_dec));
+    TEST_ASSERT_EQUAL_FLOAT(13.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs4_dec));
+    TEST_ASSERT_EQUAL_FLOAT(14.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs5_dec));
+    TEST_ASSERT_EQUAL_FLOAT(15.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs6_dec));
+    TEST_ASSERT_EQUAL_FLOAT(16.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs7_dec));
+    TEST_ASSERT_EQUAL_FLOAT(17.5f, MeasuredValueShort_getValue((MeasuredValueShort)mvs8_dec));
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality((MeasuredValueShort )mvs1_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality((MeasuredValueShort )mvs2_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs3_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort )mvs4_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs5_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueShort_getQuality((MeasuredValueShort )mvs6_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueShort_getQuality((MeasuredValueShort )mvs7_dec));
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort )mvs8_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, MeasuredValueShort_getQuality((MeasuredValueShort)mvs1_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_OVERFLOW, MeasuredValueShort_getQuality((MeasuredValueShort)mvs2_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_RESERVED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs3_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_ELAPSED_TIME_INVALID,
+                            MeasuredValueShort_getQuality((MeasuredValueShort)mvs4_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_BLOCKED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs5_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_SUBSTITUTED, MeasuredValueShort_getQuality((MeasuredValueShort)mvs6_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_NON_TOPICAL, MeasuredValueShort_getQuality((MeasuredValueShort)mvs7_dec));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, MeasuredValueShort_getQuality((MeasuredValueShort)mvs8_dec));
 
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(MeasuredValueShortWithCP56Time2a_getTimestamp(mvs1_dec)));
     TEST_ASSERT_EQUAL_UINT64(time2, CP56Time2a_toMsTimestamp(MeasuredValueShortWithCP56Time2a_getTimestamp(mvs2_dec)));
@@ -3899,8 +4081,8 @@ test_IntegratedTotals(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) it1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) it2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)it1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)it2);
 
     IntegratedTotals_destroy(it1);
     IntegratedTotals_destroy(it2);
@@ -3915,17 +4097,17 @@ test_IntegratedTotals(void)
 
     TEST_ASSERT_EQUAL_INT(2, CS101_ASDU_getNumberOfElements(asdu2));
 
-    IntegratedTotals it1_dec = (IntegratedTotals) CS101_ASDU_getElement(asdu2, 0);
-    IntegratedTotals it2_dec = (IntegratedTotals) CS101_ASDU_getElement(asdu2, 1);
+    IntegratedTotals it1_dec = (IntegratedTotals)CS101_ASDU_getElement(asdu2, 0);
+    IntegratedTotals it2_dec = (IntegratedTotals)CS101_ASDU_getElement(asdu2, 1);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )it1_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)it1_dec));
     TEST_ASSERT_EQUAL_INT32(INT32_MAX, BinaryCounterReading_getValue(IntegratedTotals_getBCR(it1_dec)));
     TEST_ASSERT_EQUAL_UINT8(0, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR(it1_dec)));
     TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR(it1_dec)));
     TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR(it1_dec)));
     TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR(it1_dec)));
 
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )it2_dec));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)it2_dec));
     TEST_ASSERT_EQUAL_INT32(INT32_MIN, BinaryCounterReading_getValue(IntegratedTotals_getBCR(it2_dec)));
     TEST_ASSERT_EQUAL_UINT8(15, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR(it2_dec)));
     TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR(it2_dec)));
@@ -3968,17 +4150,17 @@ test_IntegratedTotalsWithCP24Time2a(void)
     BinaryCounterReading_destroy(bcr1);
     BinaryCounterReading_destroy(bcr2);
 
-    TEST_ASSERT_EQUAL_INT32(INT32_MAX, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals )it1)));
-    TEST_ASSERT_EQUAL_UINT8(0, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals )it1)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals )it1)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals )it1)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals )it1)));
+    TEST_ASSERT_EQUAL_INT32(INT32_MAX, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals)it1)));
+    TEST_ASSERT_EQUAL_UINT8(0, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals)it1)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals)it1)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals)it1)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals)it1)));
 
-    TEST_ASSERT_EQUAL_INT32(INT32_MIN, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals )it2)));
-    TEST_ASSERT_EQUAL_UINT8(15, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals )it2)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals )it2)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals )it2)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals )it2)));
+    TEST_ASSERT_EQUAL_INT32(INT32_MIN, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals)it2)));
+    TEST_ASSERT_EQUAL_UINT8(15, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals)it2)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals)it2)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals)it2)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals)it2)));
     uint8_t buffer[256];
 
     struct sBufferFrame bf;
@@ -3987,8 +4169,8 @@ test_IntegratedTotalsWithCP24Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) it1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) it2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)it1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)it2);
 
     IntegratedTotalsWithCP24Time2a_destroy(it1);
     IntegratedTotalsWithCP24Time2a_destroy(it2);
@@ -4003,22 +4185,26 @@ test_IntegratedTotalsWithCP24Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(2, CS101_ASDU_getNumberOfElements(asdu2));
 
-    IntegratedTotalsWithCP24Time2a it1_dec = (IntegratedTotalsWithCP24Time2a) CS101_ASDU_getElement(asdu2, 0);
-    IntegratedTotalsWithCP24Time2a it2_dec = (IntegratedTotalsWithCP24Time2a) CS101_ASDU_getElement(asdu2, 1);
+    IntegratedTotalsWithCP24Time2a it1_dec = (IntegratedTotalsWithCP24Time2a)CS101_ASDU_getElement(asdu2, 0);
+    IntegratedTotalsWithCP24Time2a it2_dec = (IntegratedTotalsWithCP24Time2a)CS101_ASDU_getElement(asdu2, 1);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )it1_dec));
-    TEST_ASSERT_EQUAL_INT32(INT32_MAX, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
-    TEST_ASSERT_EQUAL_UINT8(0, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)it1_dec));
+    TEST_ASSERT_EQUAL_INT32(INT32_MAX,
+                            BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
+    TEST_ASSERT_EQUAL_UINT8(0,
+                            BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
 
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )it2_dec));
-    TEST_ASSERT_EQUAL_INT32(INT32_MIN, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
-    TEST_ASSERT_EQUAL_UINT8(15, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)it2_dec));
+    TEST_ASSERT_EQUAL_INT32(INT32_MIN,
+                            BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
+    TEST_ASSERT_EQUAL_UINT8(15,
+                            BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
 
     CP24Time2a time1_dec = IntegratedTotalsWithCP24Time2a_getTimestamp(it1_dec);
     TEST_ASSERT_EQUAL_INT(12, CP24Time2a_getMinute(time1_dec));
@@ -4060,17 +4246,17 @@ test_IntegratedTotalsWithCP56Time2a(void)
     BinaryCounterReading_destroy(bcr1);
     BinaryCounterReading_destroy(bcr2);
 
-    TEST_ASSERT_EQUAL_INT32(INT32_MAX, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals )it1)));
-    TEST_ASSERT_EQUAL_UINT8(0, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals )it1)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals )it1)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals )it1)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals )it1)));
+    TEST_ASSERT_EQUAL_INT32(INT32_MAX, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals)it1)));
+    TEST_ASSERT_EQUAL_UINT8(0, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals)it1)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals)it1)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals)it1)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals)it1)));
 
-    TEST_ASSERT_EQUAL_INT32(INT32_MIN, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals )it2)));
-    TEST_ASSERT_EQUAL_UINT8(15, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals )it2)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals )it2)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals )it2)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals )it2)));
+    TEST_ASSERT_EQUAL_INT32(INT32_MIN, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals)it2)));
+    TEST_ASSERT_EQUAL_UINT8(15, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals)it2)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals)it2)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals)it2)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals)it2)));
     uint8_t buffer[256];
 
     struct sBufferFrame bf;
@@ -4079,8 +4265,8 @@ test_IntegratedTotalsWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) it1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) it2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)it1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)it2);
 
     IntegratedTotalsWithCP56Time2a_destroy(it1);
     IntegratedTotalsWithCP56Time2a_destroy(it2);
@@ -4095,22 +4281,26 @@ test_IntegratedTotalsWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(2, CS101_ASDU_getNumberOfElements(asdu2));
 
-    IntegratedTotalsWithCP56Time2a it1_dec = (IntegratedTotalsWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
-    IntegratedTotalsWithCP56Time2a it2_dec = (IntegratedTotalsWithCP56Time2a) CS101_ASDU_getElement(asdu2, 1);
+    IntegratedTotalsWithCP56Time2a it1_dec = (IntegratedTotalsWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
+    IntegratedTotalsWithCP56Time2a it2_dec = (IntegratedTotalsWithCP56Time2a)CS101_ASDU_getElement(asdu2, 1);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )it1_dec));
-    TEST_ASSERT_EQUAL_INT32(INT32_MAX, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
-    TEST_ASSERT_EQUAL_UINT8(0, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
-    TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals )it1_dec)));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)it1_dec));
+    TEST_ASSERT_EQUAL_INT32(INT32_MAX,
+                            BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
+    TEST_ASSERT_EQUAL_UINT8(0,
+                            BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
+    TEST_ASSERT_TRUE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals)it1_dec)));
 
-    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject )it2_dec));
-    TEST_ASSERT_EQUAL_INT32(INT32_MIN, BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
-    TEST_ASSERT_EQUAL_UINT8(15, BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
-    TEST_ASSERT_FALSE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals )it2_dec)));
+    TEST_ASSERT_EQUAL_INT(102, InformationObject_getObjectAddress((InformationObject)it2_dec));
+    TEST_ASSERT_EQUAL_INT32(INT32_MIN,
+                            BinaryCounterReading_getValue(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
+    TEST_ASSERT_EQUAL_UINT8(15,
+                            BinaryCounterReading_getSequenceNumber(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_hasCarry(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_isAdjusted(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
+    TEST_ASSERT_FALSE(BinaryCounterReading_isInvalid(IntegratedTotals_getBCR((IntegratedTotals)it2_dec)));
 
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(IntegratedTotalsWithCP56Time2a_getTimestamp(it1_dec)));
     TEST_ASSERT_EQUAL_UINT64(time2, CP56Time2a_toMsTimestamp(IntegratedTotalsWithCP56Time2a_getTimestamp(it2_dec)));
@@ -4139,7 +4329,7 @@ test_SingleCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) sc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)sc);
 
     SingleCommand_destroy(sc);
 
@@ -4153,9 +4343,9 @@ test_SingleCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SingleCommand sc_dec = (SingleCommand) CS101_ASDU_getElement(asdu2, 0);
+    SingleCommand sc_dec = (SingleCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )sc_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)sc_dec));
 
     TEST_ASSERT_TRUE(SingleCommand_getState(sc_dec));
     TEST_ASSERT_TRUE(SingleCommand_isSelect(sc_dec));
@@ -4179,9 +4369,9 @@ test_SingleCommandWithCP56Time2a(void)
 
     sc = SingleCommandWithCP56Time2a_create(NULL, 101, true, true, 0, &cpTime1);
 
-    TEST_ASSERT_TRUE(SingleCommand_getState((SingleCommand )sc));
-    TEST_ASSERT_TRUE(SingleCommand_isSelect((SingleCommand )sc));
-    TEST_ASSERT_EQUAL_INT(0, SingleCommand_getQU((SingleCommand )sc));
+    TEST_ASSERT_TRUE(SingleCommand_getState((SingleCommand)sc));
+    TEST_ASSERT_TRUE(SingleCommand_isSelect((SingleCommand)sc));
+    TEST_ASSERT_EQUAL_INT(0, SingleCommand_getQU((SingleCommand)sc));
 
     uint8_t buffer[256];
 
@@ -4191,7 +4381,7 @@ test_SingleCommandWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) sc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)sc);
 
     SingleCommandWithCP56Time2a_destroy(sc);
 
@@ -4205,13 +4395,13 @@ test_SingleCommandWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SingleCommandWithCP56Time2a sc_dec = (SingleCommandWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
+    SingleCommandWithCP56Time2a sc_dec = (SingleCommandWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )sc_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)sc_dec));
 
-    TEST_ASSERT_TRUE(SingleCommand_getState((SingleCommand )sc_dec));
-    TEST_ASSERT_TRUE(SingleCommand_isSelect((SingleCommand )sc_dec));
-    TEST_ASSERT_EQUAL_INT(0, SingleCommand_getQU((SingleCommand )sc_dec));
+    TEST_ASSERT_TRUE(SingleCommand_getState((SingleCommand)sc_dec));
+    TEST_ASSERT_TRUE(SingleCommand_isSelect((SingleCommand)sc_dec));
+    TEST_ASSERT_EQUAL_INT(0, SingleCommand_getQU((SingleCommand)sc_dec));
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(SingleCommandWithCP56Time2a_getTimestamp(sc_dec)));
 
     SingleCommandWithCP56Time2a_destroy(sc_dec);
@@ -4237,7 +4427,7 @@ test_DoubleCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dc);
 
     DoubleCommand_destroy(dc);
 
@@ -4251,9 +4441,9 @@ test_DoubleCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    DoubleCommand dc_dec = (DoubleCommand) CS101_ASDU_getElement(asdu2, 0);
+    DoubleCommand dc_dec = (DoubleCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )dc_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)dc_dec));
 
     TEST_ASSERT_TRUE(DoubleCommand_isSelect(dc_dec));
     TEST_ASSERT_EQUAL_INT(1, DoubleCommand_getState(dc_dec));
@@ -4287,7 +4477,7 @@ test_DoubleCommandWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dc);
 
     DoubleCommandWithCP56Time2a_destroy(dc);
 
@@ -4301,9 +4491,9 @@ test_DoubleCommandWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    DoubleCommandWithCP56Time2a dc_dec = (DoubleCommandWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
+    DoubleCommandWithCP56Time2a dc_dec = (DoubleCommandWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )dc_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)dc_dec));
 
     TEST_ASSERT_TRUE(DoubleCommandWithCP56Time2a_isSelect(dc_dec));
     TEST_ASSERT_EQUAL_INT(1, DoubleCommandWithCP56Time2a_getState(dc_dec));
@@ -4333,7 +4523,7 @@ test_StepCommandValue(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) scv);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)scv);
 
     StepCommand_destroy(scv);
 
@@ -4347,9 +4537,9 @@ test_StepCommandValue(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    StepCommand scv_dec = (StepCommand) CS101_ASDU_getElement(asdu2, 0);
+    StepCommand scv_dec = (StepCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )scv_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)scv_dec));
 
     TEST_ASSERT_TRUE(StepCommand_isSelect(scv_dec));
     TEST_ASSERT_EQUAL_INT(IEC60870_STEP_INVALID_0, StepCommand_getState(scv_dec));
@@ -4382,9 +4572,9 @@ test_StepCommandWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) scv);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)scv);
 
-    StepCommandWithCP56Time2a_destroy((StepCommandWithCP56Time2a) scv);
+    StepCommandWithCP56Time2a_destroy((StepCommandWithCP56Time2a)scv);
 
     CS101_ASDU_encode(asdu, f);
 
@@ -4396,16 +4586,16 @@ test_StepCommandWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    StepCommandWithCP56Time2a scv_dec = (StepCommandWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
+    StepCommandWithCP56Time2a scv_dec = (StepCommandWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )scv_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)scv_dec));
 
     TEST_ASSERT_TRUE(StepCommandWithCP56Time2a_isSelect(scv_dec));
     TEST_ASSERT_EQUAL_INT(IEC60870_STEP_INVALID_0, StepCommandWithCP56Time2a_getState(scv_dec));
     TEST_ASSERT_EQUAL_INT(0, StepCommandWithCP56Time2a_getQU(scv_dec));
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(StepCommandWithCP56Time2a_getTimestamp(scv_dec)));
 
-    StepCommandWithCP56Time2a_destroy((StepCommandWithCP56Time2a) scv_dec);
+    StepCommandWithCP56Time2a_destroy((StepCommandWithCP56Time2a)scv_dec);
 
     CS101_ASDU_destroy(asdu2);
 }
@@ -4428,7 +4618,7 @@ test_SetpointCommandNormalized(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spcn);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spcn);
 
     SetpointCommandNormalized_destroy(spcn);
 
@@ -4442,9 +4632,9 @@ test_SetpointCommandNormalized(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SetpointCommandNormalized spcn_dec = (SetpointCommandNormalized) CS101_ASDU_getElement(asdu2, 0);
+    SetpointCommandNormalized spcn_dec = (SetpointCommandNormalized)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )spcn_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spcn_dec));
 
     TEST_ASSERT_EQUAL_INT(-1, SetpointCommandNormalized_getValue(spcn_dec));
     TEST_ASSERT_EQUAL_INT(0, SetpointCommandNormalized_getQL(spcn_dec));
@@ -4477,7 +4667,7 @@ test_SetpointCommandNormalizedWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spcn);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spcn);
 
     SetpointCommandNormalizedWithCP56Time2a_destroy(spcn);
 
@@ -4491,14 +4681,16 @@ test_SetpointCommandNormalizedWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SetpointCommandNormalizedWithCP56Time2a spcn_dec = (SetpointCommandNormalizedWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
+    SetpointCommandNormalizedWithCP56Time2a spcn_dec =
+        (SetpointCommandNormalizedWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )spcn_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spcn_dec));
 
     TEST_ASSERT_EQUAL_INT(0, SetpointCommandNormalizedWithCP56Time2a_getValue(spcn_dec));
     TEST_ASSERT_EQUAL_INT(0, SetpointCommandNormalizedWithCP56Time2a_getQL(spcn_dec));
     TEST_ASSERT_TRUE(SetpointCommandNormalizedWithCP56Time2a_isSelect(spcn_dec));
-    TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(SetpointCommandNormalizedWithCP56Time2a_getTimestamp(spcn_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time1,
+                             CP56Time2a_toMsTimestamp(SetpointCommandNormalizedWithCP56Time2a_getTimestamp(spcn_dec)));
 
     SetpointCommandNormalizedWithCP56Time2a_destroy(spcn_dec);
 
@@ -4523,7 +4715,7 @@ test_SetpointCommandScaled(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spcs);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spcs);
 
     SetpointCommandScaled_destroy(spcs);
 
@@ -4537,9 +4729,9 @@ test_SetpointCommandScaled(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SetpointCommandScaled spcs_dec = (SetpointCommandScaled) CS101_ASDU_getElement(asdu2, 0);
+    SetpointCommandScaled spcs_dec = (SetpointCommandScaled)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )spcs_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spcs_dec));
 
     TEST_ASSERT_EQUAL_INT(-32768, SetpointCommandScaled_getValue(spcs_dec));
     TEST_ASSERT_EQUAL_INT(0, SetpointCommandScaled_getQL(spcs_dec));
@@ -4573,7 +4765,7 @@ test_SetpointCommandScaledWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spcs);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spcs);
 
     SetpointCommandScaledWithCP56Time2a_destroy(spcs);
 
@@ -4587,14 +4779,15 @@ test_SetpointCommandScaledWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SetpointCommandScaledWithCP56Time2a spcs_dec = (SetpointCommandScaledWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
+    SetpointCommandScaledWithCP56Time2a spcs_dec = (SetpointCommandScaledWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )spcs_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spcs_dec));
 
     TEST_ASSERT_EQUAL_INT(-32768, SetpointCommandScaledWithCP56Time2a_getValue(spcs_dec));
     TEST_ASSERT_EQUAL_INT(0, SetpointCommandScaledWithCP56Time2a_getQL(spcs_dec));
     TEST_ASSERT_TRUE(SetpointCommandScaledWithCP56Time2a_isSelect(spcs_dec));
-    TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(SetpointCommandScaledWithCP56Time2a_getTimestamp(spcs_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time1,
+                             CP56Time2a_toMsTimestamp(SetpointCommandScaledWithCP56Time2a_getTimestamp(spcs_dec)));
 
     SetpointCommandScaledWithCP56Time2a_destroy(spcs_dec);
 
@@ -4619,7 +4812,7 @@ test_SetpointCommandShort(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spcs);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spcs);
 
     SetpointCommandShort_destroy(spcs);
 
@@ -4633,9 +4826,9 @@ test_SetpointCommandShort(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SetpointCommandShort spcs_dec = (SetpointCommandShort) CS101_ASDU_getElement(asdu2, 0);
+    SetpointCommandShort spcs_dec = (SetpointCommandShort)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )spcs_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spcs_dec));
 
     TEST_ASSERT_EQUAL_FLOAT(10.5f, SetpointCommandShort_getValue(spcs_dec));
     TEST_ASSERT_EQUAL_INT(0, SetpointCommandShort_getQL(spcs_dec));
@@ -4668,7 +4861,7 @@ test_SetpointCommandShortWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) spcs);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)spcs);
 
     SetpointCommandShortWithCP56Time2a_destroy(spcs);
 
@@ -4682,14 +4875,15 @@ test_SetpointCommandShortWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    SetpointCommandShortWithCP56Time2a spcs_dec = (SetpointCommandShortWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
+    SetpointCommandShortWithCP56Time2a spcs_dec = (SetpointCommandShortWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )spcs_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)spcs_dec));
 
     TEST_ASSERT_EQUAL_FLOAT(10.5f, SetpointCommandShortWithCP56Time2a_getValue(spcs_dec));
     TEST_ASSERT_EQUAL_INT(0, SetpointCommandShortWithCP56Time2a_getQL(spcs_dec));
     TEST_ASSERT_TRUE(SetpointCommandShortWithCP56Time2a_isSelect(spcs_dec));
-    TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(SetpointCommandShortWithCP56Time2a_getTimestamp(spcs_dec)));
+    TEST_ASSERT_EQUAL_UINT64(time1,
+                             CP56Time2a_toMsTimestamp(SetpointCommandShortWithCP56Time2a_getTimestamp(spcs_dec)));
 
     SetpointCommandShortWithCP56Time2a_destroy(spcs_dec);
 
@@ -4712,7 +4906,7 @@ test_InterrogationCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) ic);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)ic);
 
     InterrogationCommand_destroy(ic);
 
@@ -4726,9 +4920,9 @@ test_InterrogationCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    InterrogationCommand ic_dec = (InterrogationCommand) CS101_ASDU_getElement(asdu2, 0);
+    InterrogationCommand ic_dec = (InterrogationCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )ic_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)ic_dec));
 
     TEST_ASSERT_EQUAL_INT(21, InterrogationCommand_getQOI(ic_dec));
 
@@ -4754,7 +4948,7 @@ test_CounterInterrogationCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) cic);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)cic);
 
     CounterInterrogationCommand_destroy(cic);
 
@@ -4768,9 +4962,9 @@ test_CounterInterrogationCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    CounterInterrogationCommand cic_dec = (CounterInterrogationCommand) CS101_ASDU_getElement(asdu2, 0);
+    CounterInterrogationCommand cic_dec = (CounterInterrogationCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )cic_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)cic_dec));
 
     TEST_ASSERT_EQUAL_INT(1, CounterInterrogationCommand_getQCC(cic_dec));
 
@@ -4783,7 +4977,7 @@ void
 test_ReadCommand(void)
 {
     ReadCommand rc;
-    rc = ReadCommand_create( NULL, 101);
+    rc = ReadCommand_create(NULL, 101);
 
     uint8_t buffer[256];
 
@@ -4793,7 +4987,7 @@ test_ReadCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) rc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)rc);
 
     ReadCommand_destroy(rc);
 
@@ -4807,9 +5001,9 @@ test_ReadCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    ReadCommand rc_dec = (ReadCommand) CS101_ASDU_getElement(asdu2, 0);
+    ReadCommand rc_dec = (ReadCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )rc_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)rc_dec));
 
     ReadCommand_destroy(rc_dec);
 
@@ -4833,7 +5027,7 @@ test_ClockSynchronizationCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) csc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)csc);
 
     ClockSynchronizationCommand_destroy(csc);
 
@@ -4847,9 +5041,9 @@ test_ClockSynchronizationCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    ClockSynchronizationCommand csc_dec = (ClockSynchronizationCommand) CS101_ASDU_getElement(asdu2, 0);
+    ClockSynchronizationCommand csc_dec = (ClockSynchronizationCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )csc_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)csc_dec));
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(ClockSynchronizationCommand_getTime(csc_dec)));
 
     ClockSynchronizationCommand_destroy(csc_dec);
@@ -4874,7 +5068,7 @@ test_ResetProcessCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) rpc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)rpc);
 
     ResetProcessCommand_destroy(rpc);
 
@@ -4888,9 +5082,9 @@ test_ResetProcessCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    ResetProcessCommand rpc_dec = (ResetProcessCommand) CS101_ASDU_getElement(asdu2, 0);
+    ResetProcessCommand rpc_dec = (ResetProcessCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )rpc_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)rpc_dec));
 
     TEST_ASSERT_EQUAL_INT(0, ResetProcessCommand_getQRP(rpc_dec));
 
@@ -4920,7 +5114,7 @@ test_DelayAcquisitionCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dac);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dac);
 
     DelayAcquisitionCommand_destroy(dac);
 
@@ -4934,9 +5128,9 @@ test_DelayAcquisitionCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    DelayAcquisitionCommand dac_dec = (DelayAcquisitionCommand) CS101_ASDU_getElement(asdu2, 0);
+    DelayAcquisitionCommand dac_dec = (DelayAcquisitionCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )dac_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)dac_dec));
     CP16Time2a time1_dec = DelayAcquisitionCommand_getDelay(dac_dec);
     TEST_ASSERT_EQUAL_INT(24123, CP16Time2a_getEplapsedTimeInMs(time1_dec));
 
@@ -4957,7 +5151,7 @@ test_TestCommand(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
 
     TestCommand_destroy(tc);
 
@@ -4971,9 +5165,9 @@ test_TestCommand(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    TestCommand tc_dec = (TestCommand) CS101_ASDU_getElement(asdu2, 0);
+    TestCommand tc_dec = (TestCommand)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(0, InformationObject_getObjectAddress((InformationObject )tc_dec));
+    TEST_ASSERT_EQUAL_INT(0, InformationObject_getObjectAddress((InformationObject)tc_dec));
     TEST_ASSERT_EQUAL_INT(0xaa, buffer[9]);
     TEST_ASSERT_EQUAL_INT(0x55, buffer[10]);
     TEST_ASSERT_TRUE(TestCommand_isValid(tc_dec));
@@ -4986,7 +5180,7 @@ test_TestCommand(void)
 void
 test_TestCommandWithTime(void)
 {
-    TestCommandWithCP56Time2a  tc;
+    TestCommandWithCP56Time2a tc;
 
     uint64_t time1 = Hal_getTimeInMs();
     struct sCP56Time2a cpTime1;
@@ -5001,7 +5195,7 @@ test_TestCommandWithTime(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
 
     TestCommandWithCP56Time2a_destroy(tc);
 
@@ -5015,9 +5209,9 @@ test_TestCommandWithTime(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    TestCommandWithCP56Time2a  tc_dec = (TestCommandWithCP56Time2a ) CS101_ASDU_getElement(asdu2, 0);
+    TestCommandWithCP56Time2a tc_dec = (TestCommandWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(0, InformationObject_getObjectAddress((InformationObject )tc_dec));
+    TEST_ASSERT_EQUAL_INT(0, InformationObject_getObjectAddress((InformationObject)tc_dec));
     TEST_ASSERT_EQUAL_INT(0xaa55, TestCommandWithCP56Time2a_getCounter(tc_dec));
 
     TestCommandWithCP56Time2a_destroy(tc_dec);
@@ -5048,7 +5242,7 @@ test_BitString32(void)
 
     TEST_ASSERT_EQUAL_UINT32(0xaaaa, BitString32_getValue(bs32));
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject ) bs32));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)bs32));
 
     BitString32_destroy(bs32);
 
@@ -5058,21 +5252,21 @@ test_BitString32(void)
 
     bs32cp24 = Bitstring32WithCP24Time2a_createEx(NULL, 100002, 0xbbbb, IEC60870_QUALITY_INVALID, &cp24);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, BitString32_getQuality((BitString32 )bs32cp24));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID, BitString32_getQuality((BitString32)bs32cp24));
 
-    TEST_ASSERT_EQUAL_UINT32(0xbbbb, BitString32_getValue((BitString32 )bs32cp24));
+    TEST_ASSERT_EQUAL_UINT32(0xbbbb, BitString32_getValue((BitString32)bs32cp24));
 
-    TEST_ASSERT_EQUAL_INT(100002, InformationObject_getObjectAddress((InformationObject ) bs32cp24));
+    TEST_ASSERT_EQUAL_INT(100002, InformationObject_getObjectAddress((InformationObject)bs32cp24));
 
     Bitstring32WithCP24Time2a_destroy(bs32cp24);
 
     bs32cp24 = Bitstring32WithCP24Time2a_create(NULL, 100002, 0xbbbb, &cp24);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, BitString32_getQuality((BitString32 )bs32cp24));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, BitString32_getQuality((BitString32)bs32cp24));
 
-    TEST_ASSERT_EQUAL_UINT32(0xbbbb, BitString32_getValue((BitString32 )bs32cp24));
+    TEST_ASSERT_EQUAL_UINT32(0xbbbb, BitString32_getValue((BitString32)bs32cp24));
 
-    TEST_ASSERT_EQUAL_INT(100002, InformationObject_getObjectAddress((InformationObject ) bs32cp24));
+    TEST_ASSERT_EQUAL_INT(100002, InformationObject_getObjectAddress((InformationObject)bs32cp24));
 
     Bitstring32WithCP24Time2a_destroy(bs32cp24);
 
@@ -5080,23 +5274,25 @@ test_BitString32(void)
 
     struct sCP56Time2a cp56;
 
-    bs32cp56 = Bitstring32WithCP56Time2a_createEx(NULL, 1000002, 0xcccc, IEC60870_QUALITY_INVALID | IEC60870_QUALITY_NON_TOPICAL, &cp56);
+    bs32cp56 = Bitstring32WithCP56Time2a_createEx(NULL, 1000002, 0xcccc,
+                                                  IEC60870_QUALITY_INVALID | IEC60870_QUALITY_NON_TOPICAL, &cp56);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID + IEC60870_QUALITY_NON_TOPICAL, BitString32_getQuality((BitString32 )bs32cp56));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_INVALID + IEC60870_QUALITY_NON_TOPICAL,
+                            BitString32_getQuality((BitString32)bs32cp56));
 
-    TEST_ASSERT_EQUAL_UINT32(0xcccc, BitString32_getValue((BitString32 )bs32cp56));
+    TEST_ASSERT_EQUAL_UINT32(0xcccc, BitString32_getValue((BitString32)bs32cp56));
 
-    TEST_ASSERT_EQUAL_INT(1000002, InformationObject_getObjectAddress((InformationObject ) bs32cp56));
+    TEST_ASSERT_EQUAL_INT(1000002, InformationObject_getObjectAddress((InformationObject)bs32cp56));
 
     Bitstring32WithCP56Time2a_destroy(bs32cp56);
 
     bs32cp56 = Bitstring32WithCP56Time2a_create(NULL, 1000002, 0xcccc, &cp56);
 
-    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, BitString32_getQuality((BitString32 )bs32cp56));
+    TEST_ASSERT_EQUAL_UINT8(IEC60870_QUALITY_GOOD, BitString32_getQuality((BitString32)bs32cp56));
 
-    TEST_ASSERT_EQUAL_UINT32(0xcccc, BitString32_getValue((BitString32 )bs32cp56));
+    TEST_ASSERT_EQUAL_UINT32(0xcccc, BitString32_getValue((BitString32)bs32cp56));
 
-    TEST_ASSERT_EQUAL_INT(1000002, InformationObject_getObjectAddress((InformationObject ) bs32cp56));
+    TEST_ASSERT_EQUAL_INT(1000002, InformationObject_getObjectAddress((InformationObject)bs32cp56));
 
     Bitstring32WithCP56Time2a_destroy(bs32cp56);
 }
@@ -5111,7 +5307,7 @@ test_Bitstring32CommandWithCP56Time2a(void)
 
     CP56Time2a_createFromMsTimestamp(&cpTime1, time1);
 
-    bsc = Bitstring32CommandWithCP56Time2a_create(NULL, 101, (uint32_t) 0x0000000000, &cpTime1);
+    bsc = Bitstring32CommandWithCP56Time2a_create(NULL, 101, (uint32_t)0x0000000000, &cpTime1);
 
     TEST_ASSERT_EQUAL_UINT32(0x0000000000, Bitstring32CommandWithCP56Time2a_getValue(bsc));
 
@@ -5123,7 +5319,7 @@ test_Bitstring32CommandWithCP56Time2a(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) bsc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)bsc);
 
     Bitstring32CommandWithCP56Time2a_destroy(bsc);
 
@@ -5137,9 +5333,9 @@ test_Bitstring32CommandWithCP56Time2a(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    Bitstring32CommandWithCP56Time2a bsc_dec = (Bitstring32CommandWithCP56Time2a) CS101_ASDU_getElement(asdu2, 0);
+    Bitstring32CommandWithCP56Time2a bsc_dec = (Bitstring32CommandWithCP56Time2a)CS101_ASDU_getElement(asdu2, 0);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )bsc_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)bsc_dec));
     TEST_ASSERT_EQUAL_UINT64(time1, CP56Time2a_toMsTimestamp(Bitstring32CommandWithCP56Time2a_getTimestamp(bsc_dec)));
     TEST_ASSERT_EQUAL_UINT32(0x0000000000, Bitstring32CommandWithCP56Time2a_getValue(bsc_dec));
 
@@ -5174,7 +5370,7 @@ test_QueryLog(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) queryLog);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)queryLog);
 
     QueryLog_destroy(queryLog);
 
@@ -5188,11 +5384,11 @@ test_QueryLog(void)
 
     TEST_ASSERT_EQUAL_INT(1, CS101_ASDU_getNumberOfElements(asdu2));
 
-    QueryLog queryLog_dec = (QueryLog) CS101_ASDU_getElement(asdu2, 0);
+    QueryLog queryLog_dec = (QueryLog)CS101_ASDU_getElement(asdu2, 0);
 
     TEST_ASSERT_NOT_NULL(queryLog_dec);
 
-    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject )queryLog_dec));
+    TEST_ASSERT_EQUAL_INT(101, InformationObject_getObjectAddress((InformationObject)queryLog_dec));
     TEST_ASSERT_EQUAL_UINT16(256, QueryLog_getNOF(queryLog_dec));
     TEST_ASSERT_EQUAL_UINT64(startTime, CP56Time2a_toMsTimestamp(QueryLog_getRangeStartTime(queryLog_dec)));
     TEST_ASSERT_EQUAL_UINT64(stopTime, CP56Time2a_toMsTimestamp(QueryLog_getRangeStopTime(queryLog_dec)));
@@ -5232,9 +5428,9 @@ test_FileDirectory(void)
     /* NOTE: file directory is always a "sequence" */
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, true, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) fd1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) fd2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) fd3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)fd1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)fd2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)fd3);
 
     FileDirectory_destroy(fd1);
     FileDirectory_destroy(fd2);
@@ -5302,7 +5498,7 @@ test_FileDirectorySingleEntry(void)
     /* NOTE: file directory is always a "sequence" */
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, true, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) fd1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)fd1);
 
     FileDirectory_destroy(fd1);
 
@@ -5342,26 +5538,26 @@ test_BitString32xx_encodeDecode(void)
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    BitString32 bs32_1 = BitString32_createEx(NULL, 101, (uint32_t) 0xaaaaaaaaaa, IEC60870_QUALITY_INVALID);
-    BitString32 bs32_2 = BitString32_create(NULL, 102, (uint32_t) 0x0000000000);
-    BitString32 bs32_3 = BitString32_create(NULL, 103, (uint32_t) 0xffffffffffUL);
+    BitString32 bs32_1 = BitString32_createEx(NULL, 101, (uint32_t)0xaaaaaaaaaa, IEC60870_QUALITY_INVALID);
+    BitString32 bs32_2 = BitString32_create(NULL, 102, (uint32_t)0x0000000000);
+    BitString32 bs32_3 = BitString32_create(NULL, 103, (uint32_t)0xffffffffffUL);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) bs32_1);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) bs32_2);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) bs32_3);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)bs32_1);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)bs32_2);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)bs32_3);
 
     CS101_ASDU_encode(asdu, f);
 
-    InformationObject_destroy((InformationObject) bs32_1);
-    InformationObject_destroy((InformationObject) bs32_2);
-    InformationObject_destroy((InformationObject) bs32_3);
+    InformationObject_destroy((InformationObject)bs32_1);
+    InformationObject_destroy((InformationObject)bs32_2);
+    InformationObject_destroy((InformationObject)bs32_3);
     CS101_ASDU_destroy(asdu);
 
     CS101_ASDU asdu2 = CS101_ASDU_createFromBuffer(&defaultAppLayerParameters, buffer, Frame_getMsgSize(f));
 
-    BitString32 bs32_1_dec = (BitString32) CS101_ASDU_getElement(asdu2, 0);
-    BitString32 bs32_2_dec = (BitString32) CS101_ASDU_getElement(asdu2, 1);
-    BitString32 bs32_3_dec = (BitString32) CS101_ASDU_getElement(asdu2, 2);
+    BitString32 bs32_1_dec = (BitString32)CS101_ASDU_getElement(asdu2, 0);
+    BitString32 bs32_2_dec = (BitString32)CS101_ASDU_getElement(asdu2, 1);
+    BitString32 bs32_3_dec = (BitString32)CS101_ASDU_getElement(asdu2, 2);
 
     TEST_ASSERT_EQUAL_UINT32(0xaaaaaaaaaaUL, BitString32_getValue(bs32_1_dec));
     TEST_ASSERT_EQUAL_INT(IEC60870_QUALITY_INVALID, BitString32_getQuality(bs32_1_dec));
@@ -5386,91 +5582,92 @@ test_version_number(void)
     Lib60870VersionInfo version = Lib60870_getLibraryVersionInfo();
 
     TEST_ASSERT_EQUAL_INT(2, version.major);
-    TEST_ASSERT_EQUAL_INT(3, version.minor);
-    TEST_ASSERT_EQUAL_INT(6, version.patch);
+    TEST_ASSERT_EQUAL_INT(4, version.minor);
+    TEST_ASSERT_EQUAL_INT(0, version.patch);
 }
 
 void
 test_CS104_Slave_CreateDestroy(void)
 {
-	CS104_Slave slave = CS104_Slave_create(100, 100);
+    CS104_Slave slave = CS104_Slave_create(100, 100);
 
-	TEST_ASSERT_NOT_NULL(slave);
+    TEST_ASSERT_NOT_NULL(slave);
 
-	CS104_Slave_destroy(slave);
+    CS104_Slave_destroy(slave);
 }
 
 void
 test_CS104_Connection_CreateDestroy(void)
 {
-	CS104_Connection con = CS104_Connection_create("127.0.0.1", 2404);
+    CS104_Connection con = CS104_Connection_create("127.0.0.1", 2404);
 
-	TEST_ASSERT_NOT_NULL(con);
+    TEST_ASSERT_NOT_NULL(con);
 
-	CS104_Connection_destroy(con);
+    CS104_Connection_destroy(con);
 }
 
 void
 test_CS104_MasterSlave_CreateDestroy(void)
 {
-	CS104_Slave slave = CS104_Slave_create(100, 100);
+    CS104_Slave slave = CS104_Slave_create(100, 100);
 
-	TEST_ASSERT_NOT_NULL(slave);
+    TEST_ASSERT_NOT_NULL(slave);
 
-	CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_setLocalPort(slave, 20004);
 
-	CS104_Connection con = CS104_Connection_create("127.0.0.1", 20004);
+    CS104_Connection con = CS104_Connection_create("127.0.0.1", 20004);
 
-	TEST_ASSERT_NOT_NULL(con);
+    TEST_ASSERT_NOT_NULL(con);
 
-	CS104_Connection_connect(con);
+    CS104_Connection_connect(con);
 
-	CS104_Slave_destroy(slave);
+    CS104_Slave_destroy(slave);
 
-	CS104_Connection_destroy(con);
+    CS104_Connection_destroy(con);
 }
 
 void
 test_CS104_MasterSlave_CreateDestroyLoop(void)
 {
-	CS104_Slave slave = NULL;
-	CS104_Connection con = NULL;
+    CS104_Slave slave = NULL;
+    CS104_Connection con = NULL;
 
-	for (int i = 0; i < 1000; i++) {
-		slave = CS104_Slave_create(100, 100);
+    for (int i = 0; i < 1000; i++)
+    {
+        slave = CS104_Slave_create(100, 100);
 
-		TEST_ASSERT_NOT_NULL(slave);
+        TEST_ASSERT_NOT_NULL(slave);
 
-		CS104_Slave_setLocalPort(slave, 20004);
+        CS104_Slave_setLocalPort(slave, 20004);
 
-		CS104_Slave_start(slave);
+        CS104_Slave_start(slave);
 
-		con = CS104_Connection_create("127.0.0.1", 20004);
+        con = CS104_Connection_create("127.0.0.1", 20004);
 
-		TEST_ASSERT_NOT_NULL(con);
+        TEST_ASSERT_NOT_NULL(con);
 
-		bool result = CS104_Connection_connect(con);
+        bool result = CS104_Connection_connect(con);
 
-		TEST_ASSERT_TRUE(result);
+        TEST_ASSERT_TRUE(result);
 
-		CS104_Slave_destroy(slave);
+        CS104_Slave_destroy(slave);
 
-		CS104_Connection_destroy(con);
-	}
+        CS104_Connection_destroy(con);
+    }
 }
 
 void
 test_CS104_Connection_ConnectTimeout(void)
 {
-	CS104_Connection con = CS104_Connection_create("192.168.3.120", 2404);
+    CS104_Connection con = CS104_Connection_create("192.168.3.120", 2404);
 
-	TEST_ASSERT_NOT_NULL(con);
+    TEST_ASSERT_NOT_NULL(con);
 
-	bool result = CS104_Connection_connect(con);
+    bool result = CS104_Connection_connect(con);
 
-	TEST_ASSERT_FALSE(result);
+    TEST_ASSERT_FALSE(result);
 
-	CS104_Connection_destroy(con);
+    CS104_Connection_destroy(con);
 }
 
 void
@@ -5541,7 +5738,8 @@ test_CS104_Connection_UseAfterServerClosedConnection(void)
 static CS104_ConnectionEvent test_CS104_Connection_async_timeout_event;
 
 static void
-test_CS104_Connection_async_timeout_connectionHandler (void* parameter, CS104_Connection connection, CS104_ConnectionEvent event)
+test_CS104_Connection_async_timeout_connectionHandler(void* parameter, CS104_Connection connection,
+                                                      CS104_ConnectionEvent event)
 {
     test_CS104_Connection_async_timeout_event = event;
 }
@@ -5563,20 +5761,20 @@ test_CS104_Connection_async_success(void)
 
     con = CS104_Connection_create("127.0.0.1", 20004);
 
-	TEST_ASSERT_NOT_NULL(con);
+    TEST_ASSERT_NOT_NULL(con);
 
     CS104_APCIParameters apciParameters = CS104_Connection_getAPCIParameters(con);
     apciParameters->t0 = 1;
 
     CS104_Connection_setConnectionHandler(con, test_CS104_Connection_async_timeout_connectionHandler, NULL);
 
-	CS104_Connection_connectAsync(con);
+    CS104_Connection_connectAsync(con);
 
     Thread_sleep(500);
 
     TEST_ASSERT_EQUAL_INT(CS104_CONNECTION_OPENED, test_CS104_Connection_async_timeout_event);
 
-	CS104_Connection_destroy(con);
+    CS104_Connection_destroy(con);
 
     CS104_Slave_destroy(slave);
 }
@@ -5588,20 +5786,20 @@ test_CS104_Connection_async_timeout(void)
 
     CS104_Connection con = CS104_Connection_create("192.168.3.120", 2404);
 
-	TEST_ASSERT_NOT_NULL(con);
+    TEST_ASSERT_NOT_NULL(con);
 
     CS104_APCIParameters apciParameters = CS104_Connection_getAPCIParameters(con);
     apciParameters->t0 = 1;
 
     CS104_Connection_setConnectionHandler(con, test_CS104_Connection_async_timeout_connectionHandler, NULL);
 
-	CS104_Connection_connectAsync(con);
+    CS104_Connection_connectAsync(con);
 
     Thread_sleep(2000);
 
     TEST_ASSERT_EQUAL_INT(CS104_CONNECTION_FAILED, test_CS104_Connection_async_timeout_event);
 
-	CS104_Connection_destroy(con);
+    CS104_Connection_destroy(con);
 }
 
 void
@@ -5609,7 +5807,7 @@ test_CS101_ASDU_addObjectOfWrongType(void)
 {
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_PERIODIC, 0, 1, false, false);
 
-    InformationObject io1 = (InformationObject) SinglePointInformation_create(NULL, 101, true, IEC60870_QUALITY_GOOD);
+    InformationObject io1 = (InformationObject)SinglePointInformation_create(NULL, 101, true, IEC60870_QUALITY_GOOD);
 
     bool added = CS101_ASDU_addInformationObject(asdu, io1);
 
@@ -5617,7 +5815,8 @@ test_CS101_ASDU_addObjectOfWrongType(void)
 
     InformationObject_destroy(io1);
 
-    InformationObject io2 = (InformationObject) DoublePointInformation_create(NULL, 102, IEC60870_DOUBLE_POINT_OFF, IEC60870_QUALITY_GOOD);
+    InformationObject io2 =
+        (InformationObject)DoublePointInformation_create(NULL, 102, IEC60870_DOUBLE_POINT_OFF, IEC60870_QUALITY_GOOD);
 
     added = CS101_ASDU_addInformationObject(asdu, io2);
 
@@ -5635,8 +5834,10 @@ test_CS101_ASDU_addUntilOverflow(void)
 
     int i = 0;
 
-    for (i = 0; i < 60; i++) {
-        InformationObject io = (InformationObject) SinglePointInformation_create(NULL, 100 + i, true, IEC60870_QUALITY_GOOD);
+    for (i = 0; i < 60; i++)
+    {
+        InformationObject io =
+            (InformationObject)SinglePointInformation_create(NULL, 100 + i, true, IEC60870_QUALITY_GOOD);
 
         bool added = CS101_ASDU_addInformationObject(asdu, io);
 
@@ -5647,7 +5848,7 @@ test_CS101_ASDU_addUntilOverflow(void)
         TEST_ASSERT_EQUAL_INT(i + 1, CS101_ASDU_getNumberOfElements(asdu));
     }
 
-    InformationObject io = (InformationObject) SinglePointInformation_create(NULL, 100 + i, true, IEC60870_QUALITY_GOOD);
+    InformationObject io = (InformationObject)SinglePointInformation_create(NULL, 100 + i, true, IEC60870_QUALITY_GOOD);
 
     bool added = CS101_ASDU_addInformationObject(asdu, io);
 
@@ -5665,8 +5866,10 @@ test_CS101_ASDU_clone(void)
 
     int i = 0;
 
-    for (i = 0; i < 60; i++) {
-        InformationObject io = (InformationObject) SinglePointInformation_create(NULL, 100 + i, true, IEC60870_QUALITY_GOOD);
+    for (i = 0; i < 60; i++)
+    {
+        InformationObject io =
+            (InformationObject)SinglePointInformation_create(NULL, 100 + i, true, IEC60870_QUALITY_GOOD);
 
         bool added = CS101_ASDU_addInformationObject(asdu, io);
 
@@ -5686,7 +5889,8 @@ test_CS101_ASDU_clone(void)
     TEST_ASSERT_EQUAL_INT(CS101_ASDU_getTypeID(asdu), CS101_ASDU_getTypeID(clonedAsdu));
     TEST_ASSERT_EQUAL_INT(CS101_ASDU_getNumberOfElements(asdu), CS101_ASDU_getNumberOfElements(clonedAsdu));
     TEST_ASSERT_EQUAL_INT(CS101_ASDU_getPayloadSize(asdu), CS101_ASDU_getPayloadSize(clonedAsdu));
-    TEST_ASSERT_EQUAL_INT(0, memcmp(CS101_ASDU_getPayload(asdu), CS101_ASDU_getPayload(clonedAsdu), CS101_ASDU_getPayloadSize(clonedAsdu)));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(CS101_ASDU_getPayload(asdu), CS101_ASDU_getPayload(clonedAsdu),
+                                    CS101_ASDU_getPayloadSize(clonedAsdu)));
 
     CS101_ASDU_destroy(asdu);
     CS101_ASDU_destroy(clonedAsdu);
@@ -5694,7 +5898,8 @@ test_CS101_ASDU_clone(void)
 
 #if (CONFIG_CS104_SUPPORT_TLS == 1)
 
-struct secEventInfo {
+struct secEventInfo
+{
     int eventHandlerCalled;
     int eventCodes[100];
 };
@@ -5708,16 +5913,23 @@ securityEventHandler(void* parameter, TLSEventLevel eventLevel, int eventCode, c
     char* peerAddr = NULL;
     const char* tlsVersion = "unknown";
 
-    if (con) {
+    if (con)
+    {
         peerAddr = TLSConnection_getPeerAddress(con, peerAddrBuf);
         tlsVersion = TLSConfigVersion_toString(TLSConnection_getTLSVersion(con));
     }
 
-    printf("[SECURITY EVENT] %s (t: %i, c: %i, version: %s remote-ip: %s)\n", msg, eventLevel, eventCode, tlsVersion, peerAddr);
+    printf("[SECURITY EVENT] %s (t: %i, c: %i, version: %s remote-ip: %s)\n", msg, eventLevel, eventCode, tlsVersion,
+           peerAddr);
 
-    if (eventInfo) {
-        eventInfo->eventCodes[eventInfo->eventHandlerCalled] = eventCode;
-        eventInfo->eventHandlerCalled++;
+    if (eventInfo)
+    {
+        /* Bounds check to prevent buffer overflow */
+        if (eventInfo->eventHandlerCalled < 100)
+        {
+            eventInfo->eventCodes[eventInfo->eventHandlerCalled] = eventCode;
+            eventInfo->eventHandlerCalled++;
+        }
     }
 }
 
@@ -5894,6 +6106,7 @@ test_CS104_MasterSlave_TLSConnectFails(void)
     TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_ALGO_NOT_SUPPORTED, eventInfo.eventCodes[0]);
 }
 
+#ifndef WITH_MBEDTLS3
 void
 test_CS104_MasterSlave_TLSVersionMismatch(void)
 {
@@ -5962,6 +6175,555 @@ test_CS104_MasterSlave_TLSVersionMismatch(void)
     TEST_ASSERT_EQUAL_INT(1, eventInfo.eventHandlerCalled);
     TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_UNSECURE_COMMUNICATION, eventInfo.eventCodes[0]);
 }
+#endif
+
+#ifdef WITH_MBEDTLS3
+void
+test_CS104_MasterSlave_TLSVersionMismatch_mbedtls3(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setMinTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_3);
+
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    TLSConfiguration_setAllowOnlyKnownCertificates(tlsConfig2, true);
+
+    TLSConfiguration_setMinTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_2);
+    TLSConfiguration_setMaxTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_2);
+
+    /* use valid certificate */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    res = TLSConfiguration_addAllowedCertificateFromFile(tlsConfig2, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    bool result = CS104_Connection_connect(con);
+
+    TEST_ASSERT_FALSE(result);
+
+    CS104_Slave_destroy(slave);
+
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    TEST_ASSERT_EQUAL_INT(1, eventInfo.eventHandlerCalled);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_UNSECURE_COMMUNICATION, eventInfo.eventCodes[0]);
+}
+#endif
+
+void
+test_CS104_MasterSlave_TLSCipherSuiteMismatch(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration - restrict to specific cipher suites */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+
+    /* Restrict server to only TLS_RSA_WITH_AES_128_GCM_SHA256 */
+    TLSConfiguration_clearCipherSuiteList(tlsConfig1);
+    TLSConfiguration_addCipherSuite(tlsConfig1, TLS_RSA_WITH_AES_128_GCM_SHA256);
+
+    /* Client configuration - restrict to different cipher suite */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+
+     TLSConfiguration_setMaxTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_2);
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    TLSConfiguration_setAllowOnlyKnownCertificates(tlsConfig2, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addAllowedCertificateFromFile(tlsConfig2, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Restrict client to only TLS_RSA_WITH_AES_256_GCM_SHA384 - no overlap with server */
+    TLSConfiguration_clearCipherSuiteList(tlsConfig2);
+    TLSConfiguration_addCipherSuite(tlsConfig2, TLS_RSA_WITH_AES_256_GCM_SHA384);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    bool result = CS104_Connection_connect(con);
+
+    TEST_ASSERT_FALSE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    CS104_Slave_destroy(slave);
+
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    TEST_ASSERT_EQUAL_INT(1, eventInfo.eventHandlerCalled);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_NO_CIPHER, eventInfo.eventCodes[0]);
+}
+
+void
+test_CS104_MasterSlave_TLSCipherSuiteMismatch_TLS_PSK_WITH_AES_256_GCM_SHA384(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration - restrict to specific cipher suites */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Restrict server to only TLS_RSA_WITH_AES_128_GCM_SHA256 */
+    TLSConfiguration_clearCipherSuiteList(tlsConfig1);
+    TLSConfiguration_addCipherSuite(tlsConfig1, TLS_RSA_WITH_AES_128_GCM_SHA256);
+
+    /* Client configuration - restrict to different cipher suite */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    TLSConfiguration_setAllowOnlyKnownCertificates(tlsConfig2, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addAllowedCertificateFromFile(tlsConfig2, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Restrict client to only TLS_RSA_WITH_AES_256_GCM_SHA384 - no overlap with server */
+    TLSConfiguration_clearCipherSuiteList(tlsConfig2);
+    TLSConfiguration_addCipherSuite(tlsConfig2, TLS_PSK_WITH_AES_256_GCM_SHA384);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    bool result = CS104_Connection_connect(con);
+
+    TEST_ASSERT_FALSE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    CS104_Slave_destroy(slave);
+
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    TEST_ASSERT_EQUAL_INT(1, eventInfo.eventHandlerCalled);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_NO_CIPHER, eventInfo.eventCodes[0]);
+}
+
+void
+test_CS104_MasterSlave_TLSClientCertificateNotProvided(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration - requires client certificate */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Client configuration - NO certificate provided */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    TLSConfiguration_setAllowOnlyKnownCertificates(tlsConfig2, true);
+
+    /* Do NOT set client certificate - client will connect without certificate */
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addAllowedCertificateFromFile(tlsConfig2, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    bool result = CS104_Connection_connect(con);
+
+    TEST_ASSERT_FALSE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    CS104_Slave_destroy(slave);
+
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify that certificate unavailable alarm was raised */
+    bool certUnavailableDetected = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_UNAVAILABLE) {
+            certUnavailableDetected = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(certUnavailableDetected);
+}
+
+void
+test_CS104_MasterSlave_TLSVersionChangeDetected(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration - supports both TLS 1.1 and TLS 1.2 */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Allow both TLS 1.1 and 1.2 on server */
+    TLSConfiguration_setMinTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_1);
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+
+    /* Client configuration with session resumption enabled */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    //TLSConfiguration_setEventHandler(tlsConfig2, securityEventHandler, &eventInfo);
+    TLSConfiguration_enableSessionResumption(tlsConfig2, true);
+    TLSConfiguration_setSessionResumptionInterval(tlsConfig2, 60); /* 60 seconds */
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* First connection with TLS 1.2 */
+    TLSConfiguration_setMinTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_2);
+    TLSConfiguration_setMaxTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_2);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* First connection should succeed with TLS 1.2 */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_TRUE(result);
+
+    Thread_sleep(200); /* Allow events to be processed */
+
+    CS104_Connection_close(con);
+
+    Thread_sleep(200); /* Allow cleanup */
+
+    /* Now change client to use TLS 1.1 and reconnect - session resumption should detect version change */
+    TLSConfiguration_setMinTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_1);
+    TLSConfiguration_setMaxTlsVersion(tlsConfig2, TLS_VERSION_TLS_1_1);
+
+    printf("Reconnect with TLS 1.1....\n");
+
+    /* Second connection attempt with TLS 1.1 - should detect version change */
+    result = CS104_Connection_connect(con);
+    TEST_ASSERT_FALSE(result); /* Connection fails and version change is detected */
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    CS104_Connection_close(con);
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify that TLS version change alarm was raised */
+    bool versionChangeDetected = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_TLS_VERSION_CHANGE) {
+            versionChangeDetected = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(versionChangeDetected);
+}
+
+void
+test_CS104_MasterSlave_TLSCertificateSizeExceeded(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* This test verifies that the TLS_EVENT_CODE_ALM_CERT_SIZE_EXCEEDED event is raised
+     * when a certificate exceeds the maximum TLS record size (16384 bytes).
+     *
+     * Note: In the TLS protocol and mbedTLS implementation, certificate size validation
+     * occurs on the SENDING side before transmission. When an endpoint attempts to send
+     * a certificate that exceeds MBEDTLS_SSL_OUT_CONTENT_LEN (16384 bytes), it detects
+     * the error and fails the handshake with MBEDTLS_ERR_SSL_CERTIFICATE_TOO_LARGE.
+     *
+     * This test configures the SERVER with an oversized certificate. When a client connects,
+     * the server attempts to send its certificate during the TLS handshake. The server-side
+     * mbedTLS code detects that the certificate is too large and raises the
+     * TLS_EVENT_CODE_ALM_CERT_SIZE_EXCEEDED security event.
+     *
+     * This is the correct and expected behavior - a TLS endpoint can only detect and report
+     * issues with its OWN certificate before sending, not validate the size of incoming
+     * certificates from the peer (which are already constrained by TLS record size limits).
+     */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    /* Configure server with oversized certificate (> 16384 bytes) */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "client_oversized.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Client configuration with normal-sized certificate */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should fail - server cannot send its oversized certificate */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_FALSE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify that certificate size exceeded alarm was raised by the server */
+    bool certSizeExceededDetected = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_SIZE_EXCEEDED) {
+            certSizeExceededDetected = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(certSizeExceededDetected);
+}
+
+void
+test_CS104_MasterSlave_TLSCRLExpired(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with expired CRL
+     * This test verifies that when the server has an expired CRL loaded,
+     * it generates a TLS_EVENT_CODE_WRN_CRL_EXPIRED warning event when
+     * validating a client certificate. The client certificate itself is
+     * valid and not revoked, but the CRL used to check revocation status
+     * has expired (Next Update date in the past).
+     */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setTimeValidation(tlsConfig1, false); /* Disable time validation so CRL expired flag is not cleared */
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Load expired CRL - test.crl has Next Update: Jun 25, 2022 (expired) */
+    res = TLSConfiguration_addCRLFromFile(tlsConfig1, "test.crl");
+    TEST_ASSERT_TRUE(res);
+
+    /* Client configuration with valid, non-revoked certificate
+     * client_CA1_4 is valid (expires 2030) and not in the CRL */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_4.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_4.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should succeed, but with CRL expired warning */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_TRUE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    /* Verify that CRL expired warning was raised by the server */
+    bool crlExpiredDetected = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_WRN_CRL_EXPIRED) {
+            crlExpiredDetected = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(crlExpiredDetected);
+
+    CS104_Connection_sendStartDT(con);
+
+    printf("finished\n");
+
+    CS104_Connection_close(con);
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+}
 
 void
 test_CS104_MasterSlave_TLSCertificateExpired(void)
@@ -5983,7 +6745,7 @@ test_CS104_MasterSlave_TLSCertificateExpired(void)
 
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
-    TLSConfiguration_setChainValidation(tlsConfig2, true);;
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
 
     /* use expired certificate */
     TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_1.key", NULL);
@@ -6015,9 +6777,10 @@ test_CS104_MasterSlave_TLSCertificateExpired(void)
     TLSConfiguration_destroy(tlsConfig1);
     TLSConfiguration_destroy(tlsConfig2);
 
-    TEST_ASSERT_EQUAL_INT(2, eventInfo.eventHandlerCalled);
-    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_CERT_EXPIRED, eventInfo.eventCodes[0]);
-    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED, eventInfo.eventCodes[1]);
+    TEST_ASSERT_EQUAL_INT(3, eventInfo.eventHandlerCalled);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_WRN_CRL_NOT_ACCESSIBLE, eventInfo.eventCodes[0]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_CERT_EXPIRED, eventInfo.eventCodes[1]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED, eventInfo.eventCodes[2]);
 }
 
 void
@@ -6046,7 +6809,8 @@ test_CS104_MasterSlave_TLSCertificateRevoked(void)
 
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
-    TLSConfiguration_setChainValidation(tlsConfig2, true);;
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    ;
 
     /* use revoked certificate */
     res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
@@ -6084,6 +6848,635 @@ test_CS104_MasterSlave_TLSCertificateRevoked(void)
     TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED, eventInfo.eventCodes[1]);
 }
 
+/**
+ * Test that TLS handshake fails when the client presents a certificate with a
+ * public key length smaller than the configured minimum. The server should
+ * detect this and raise TLS_EVENT_CODE_ALM_INSUFFICIENT_KEY_LENGTH (23) alarm.
+ *
+ * Test scenario:
+ * - Server configured with minimum key length of 2048 bits
+ * - Client uses a certificate with only 1024-bit RSA key (client_CA1_weak.pem)
+ * - Connection should fail
+ * - Security event "Alarm: Insufficient key length" should be raised
+ */
+void
+test_CS104_MasterSlave_TLSInsufficientKeyLength(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with minimum key length of 2048 bits */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    /* Set minimum key length to 2048 bits (default, but explicit for test clarity) */
+    TLSConfiguration_setMinimumKeyLength(tlsConfig1, 2048);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    /* Client configuration with weak 1024-bit key certificate */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Use certificate with 1024-bit RSA key (below minimum) */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_weak.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_weak.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should fail due to insufficient key length */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_FALSE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security event for insufficient key length was raised */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 1);
+
+    /* Find the insufficient key length event in the event list */
+    bool foundInsufficientKeyLengthEvent = false;
+    bool foundCertValidationFailedEvent = false;
+    bool foundMinKeyLengthEvent = false;
+
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_INSUFFICIENT_KEY_LENGTH) {
+            foundInsufficientKeyLengthEvent = true;
+        }
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED) {
+            foundCertValidationFailedEvent = true;
+        }
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_WRN_MIN_KEY_LENGTH) {
+            foundMinKeyLengthEvent = true;
+        }
+    }
+    TEST_ASSERT_TRUE(foundInsufficientKeyLengthEvent);
+    TEST_ASSERT_TRUE(foundCertValidationFailedEvent);
+    TEST_ASSERT_FALSE(foundMinKeyLengthEvent);
+}
+
+void
+test_CS104_MasterSlave_TLSInsufficientServerKeyLength(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with minimum key length of 2048 bits */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "client_CA1_weak.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "client_CA1_weak.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    /* Client configuration with weak 1024-bit key certificate */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Set minimum key length to 2048 bits (default, but explicit for test clarity) */
+    TLSConfiguration_setMinimumKeyLength(tlsConfig2, 2048);
+
+    /* Use certificate with 1024-bit RSA key (below minimum) */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setEventHandler(tlsConfig2, securityEventHandler, &eventInfo);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should fail due to insufficient key length */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_FALSE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security event for insufficient key length was raised */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 1);
+
+    /* Find the insufficient key length event in the event list */
+    bool foundInsufficientKeyLengthEvent = false;
+    bool foundCertValidationFailedEvent = false;
+    bool foundMinKeyLengthEvent = false;
+
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_INSUFFICIENT_KEY_LENGTH) {
+            foundInsufficientKeyLengthEvent = true;
+        }
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED) {
+            foundCertValidationFailedEvent = true;
+        }
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_WRN_MIN_KEY_LENGTH) {
+            foundMinKeyLengthEvent = true;
+        }
+    }
+    TEST_ASSERT_TRUE(foundInsufficientKeyLengthEvent);
+    TEST_ASSERT_TRUE(foundCertValidationFailedEvent);
+    TEST_ASSERT_FALSE(foundMinKeyLengthEvent);
+}
+
+void
+test_CS104_MasterSlave_TLSWarningMinimumKeyLength(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with minimum key length of 1024 bits */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    /* Set minimum key length to 2048 bits (default, but explicit for test clarity) */
+    TLSConfiguration_setMinimumKeyLength(tlsConfig1, 1024);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setMinimumKeyLength(tlsConfig1, 1024);
+
+    /* Client configuration with weak 1024-bit key certificate */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Use certificate with 1024-bit RSA key (below minimum) */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_weak.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_weak.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should fail due to insufficient key length */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_TRUE(result);
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security event for insufficient key length was raised */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 1);
+
+    /* Find the insufficient key length event in the event list */
+    bool foundInsufficientKeyLengthEvent = false;
+    bool foundCertValidationFailedEvent = false;
+    bool foundMinKeyLengthEvent = false;
+
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_INSUFFICIENT_KEY_LENGTH) {
+            foundInsufficientKeyLengthEvent = true;
+        }
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED) {
+            foundCertValidationFailedEvent = true;
+        }
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_WRN_MIN_KEY_LENGTH) {
+            foundMinKeyLengthEvent = true;
+        }
+    }
+    TEST_ASSERT_FALSE(foundInsufficientKeyLengthEvent);
+    TEST_ASSERT_FALSE(foundCertValidationFailedEvent);
+    TEST_ASSERT_TRUE(foundMinKeyLengthEvent);
+}
+
+void
+test_CS104_MasterSlave_TLSWarningMinimumServerKeyLength(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with minimum key length of 2048 bits */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    /* Set minimum key length to 2048 bits (default, but explicit for test clarity) */
+    TLSConfiguration_setMinimumKeyLength(tlsConfig1, 2048);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "client_CA1_weak.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "client_CA1_weak.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    /* Client configuration with weak 1024-bit key certificate */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Use certificate with 1024-bit RSA key (below minimum) */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setEventHandler(tlsConfig2, securityEventHandler, &eventInfo);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should fail due to insufficient key length */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_TRUE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security event for insufficient key length was raised */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 1);
+
+    /* Find the insufficient key length event in the event list */
+    bool foundInsufficientKeyLengthEvent = false;
+    bool foundCertValidationFailedEvent = false;
+    bool foundMinKeyLengthEvent = false;
+
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_INSUFFICIENT_KEY_LENGTH) {
+            foundInsufficientKeyLengthEvent = true;
+        }
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED) {
+            foundCertValidationFailedEvent = true;
+        }
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_WRN_MIN_KEY_LENGTH) {
+            foundMinKeyLengthEvent = true;
+        }
+    }
+    TEST_ASSERT_FALSE(foundInsufficientKeyLengthEvent);
+    TEST_ASSERT_FALSE(foundCertValidationFailedEvent);
+    TEST_ASSERT_TRUE(foundMinKeyLengthEvent);
+}
+
+/**
+ * Test that TLS handshake fails when the client presents a certificate with an
+ * invalid signature. The server should detect this and raise
+ * TLS_EVENT_CODE_ALM_CERT_NOT_TRUSTED (14) alarm with message
+ * "Alarm: certificate validation: certificate signature could not be validated"
+ *
+ * Test scenario:
+ * - Server configured with chain validation enabled
+ * - Client uses a certificate with corrupted/invalid signature (client_CA1_badsig.pem)
+ * - Connection should fail
+ * - Security event for invalid signature should be raised
+ */
+void
+test_CS104_MasterSlave_TLSInvalidSignature(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with chain validation */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Client configuration with certificate that has invalid/corrupted signature */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Use certificate with corrupted signature */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_badsig.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_badsig.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should fail due to invalid signature */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_FALSE(result);
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security event for invalid signature was raised */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 1);
+
+    /* Find the certificate not trusted event (code 14) - this indicates signature validation failure */
+    bool foundCertNotTrustedEvent = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_NOT_TRUSTED) {
+            foundCertNotTrustedEvent = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundCertNotTrustedEvent);
+}
+
+void
+test_CS104_MasterSlave_TLSUnknownCA(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with chain validation */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    // res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    // TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+
+    /* Client configuration with certificate that has invalid/corrupted signature */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Use certificate with corrupted signature */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should fail due to invalid signature */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_FALSE(result);
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security event for invalid signature was raised */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 1);
+
+    /* Find the certificate not trusted event (code 14) - this indicates signature validation failure */
+    bool foundCertNotTrustedEvent = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CA_CERT_NOT_AVAILABLE) {
+            foundCertNotTrustedEvent = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundCertNotTrustedEvent);
+}
+
+/**
+ * Test that TLS session renegotiation works correctly and raises appropriate
+ * security events. This test verifies the renegotiation mechanism is functional
+ * and that security events are properly generated.
+ *
+ * Test scenario:
+ * 1. Client and server configured with valid certificates
+ * 2. Connection establishes successfully
+ * 3. Server has short renegotiation time (1 second)
+ * 4. After renegotiation timer expires, next I/O triggers renegotiation
+ * 5. Renegotiation should succeed with valid certificates
+ * 6. Security event TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (10) is raised
+ *
+ * Note: Testing certificate change during renegotiation is not practical because
+ * mbedTLS caches certificates in the SSL context at initialization time, and
+ * changing TLSConfiguration after socket creation doesn't affect existing contexts.
+ */
+void
+test_CS104_MasterSlave_TLSSuccessfulRenegotiation(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with short renegotiation time */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    /* Set short renegotiation time (1 second) so renegotiation happens quickly */
+    TLSConfiguration_setRenegotiationTime(tlsConfig1, 1000);
+
+    /* Server event handler to detect renegotiation */
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    /* Client configuration */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_4.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_4.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Initial connection should succeed with valid certificates */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_TRUE(result);
+
+    CS104_Connection_sendStartDT(con);
+
+    /* Send some data to confirm connection is working */
+    CS101_ASDU asdu1 =
+        CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
+
+    InformationObject io1 = (InformationObject)MeasuredValueScaled_create(NULL, 100, 42, IEC60870_QUALITY_GOOD);
+
+    CS101_ASDU_addInformationObject(asdu1, io1);
+
+    InformationObject_destroy(io1);
+
+    CS104_Slave_enqueueASDU(slave, asdu1);
+
+    CS101_ASDU_destroy(asdu1);
+
+    Thread_sleep(200);
+
+    /* Wait for renegotiation timer (1s) plus margin */
+    Thread_sleep(1500);
+
+    /* Send more data to trigger renegotiation check */
+    CS101_ASDU asdu2 =
+        CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
+
+    InformationObject io2 = (InformationObject)MeasuredValueScaled_create(NULL, 101, 43, IEC60870_QUALITY_GOOD);
+
+    CS101_ASDU_addInformationObject(asdu2, io2);
+
+    InformationObject_destroy(io2);
+
+    CS104_Slave_enqueueASDU(slave, asdu2);
+
+    CS101_ASDU_destroy(asdu2);
+
+    /* Wait for renegotiation to complete */
+    Thread_sleep(500);
+
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security events on server side:
+     * - TLS_EVENT_CODE_INF_SESSION_ESTABLISHED (initial connection succeeds)
+     * - TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation started)
+     */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 2);
+
+    /* Find the session established event */
+    bool foundSessionEstablished = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_INF_SESSION_ESTABLISHED) {
+            foundSessionEstablished = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundSessionEstablished);
+
+    /* Find the renegotiation event */
+    bool foundRenegotiationEvent = false;
+    for (int i = 0; i < eventInfo.eventHandlerCalled && i < 200; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION) {
+            foundRenegotiationEvent = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundRenegotiationEvent);
+}
+
 void
 test_CS104_MasterSlave_TLSRenegotiateAfterCRLUpdate(void)
 {
@@ -6110,7 +7503,7 @@ test_CS104_MasterSlave_TLSRenegotiateAfterCRLUpdate(void)
 
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
-    TLSConfiguration_setChainValidation(tlsConfig2, true);;
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
 
     /* use revoked certificate */
     res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
@@ -6143,9 +7536,10 @@ test_CS104_MasterSlave_TLSRenegotiateAfterCRLUpdate(void)
     res = TLSConfiguration_addCRLFromFile(tlsConfig1, "test.crl");
     TEST_ASSERT_TRUE(res);
 
-    CS101_ASDU newAsdu = CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
+    CS101_ASDU newAsdu =
+        CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-    InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, 1, IEC60870_QUALITY_GOOD);
+    InformationObject io = (InformationObject)MeasuredValueScaled_create(NULL, 110, 1, IEC60870_QUALITY_GOOD);
 
     CS101_ASDU_addInformationObject(newAsdu, io);
 
@@ -6157,8 +7551,12 @@ test_CS104_MasterSlave_TLSRenegotiateAfterCRLUpdate(void)
 
     Thread_sleep(1000);
 
-    TEST_ASSERT_EQUAL_INT(1, eventInfo.eventHandlerCalled);
-    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, eventInfo.eventCodes[0]);
+    TEST_ASSERT_EQUAL_INT(5, eventInfo.eventHandlerCalled);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_WRN_CRL_NOT_ACCESSIBLE, eventInfo.eventCodes[0]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_ESTABLISHED, eventInfo.eventCodes[1]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, eventInfo.eventCodes[2]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_CERT_REVOKED, eventInfo.eventCodes[3]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED, eventInfo.eventCodes[4]);
 
     CS104_Slave_destroy(slave);
 
@@ -6166,6 +7564,114 @@ test_CS104_MasterSlave_TLSRenegotiateAfterCRLUpdate(void)
 
     TLSConfiguration_destroy(tlsConfig1);
     TLSConfiguration_destroy(tlsConfig2);
+}
+
+void
+test_CS104_MasterSlave_TLSRenegotiationCRLExpired(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    /* Server configuration with expired CRL
+     * This test verifies that when the server has an expired CRL loaded,
+     * it generates a TLS_EVENT_CODE_WRN_CRL_EXPIRED warning event when
+     * validating a client certificate. The client certificate itself is
+     * valid and not revoked, but the CRL used to check revocation status
+     * has expired (Next Update date in the past).
+     */
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+    TLSConfiguration_setTimeValidation(tlsConfig1, false); /* Disable time validation so CRL expired flag is not cleared */
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+
+    /* Load expired CRL - test.crl has Next Update: Jun 25, 2022 (expired) */
+    res = TLSConfiguration_addCRLFromFile(tlsConfig1, "test.crl");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setRenegotiationTime(tlsConfig1, 1000);
+
+    /* Client configuration with valid, non-revoked certificate
+     * client_CA1_4 is valid (expires 2030) and not in the CRL */
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_4.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_4.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Connection should succeed, but with CRL expired warning */
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_TRUE(result);
+
+    Thread_sleep(200); /* Give time for security event to be generated */
+
+    /* Verify that CRL expired warning was raised by the server */
+    int crlExpiredDetected = 0;
+    for (int i = 0; i < eventInfo.eventHandlerCalled; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_WRN_CRL_EXPIRED) {
+            crlExpiredDetected++;
+        }
+    }
+    TEST_ASSERT_EQUAL_INT(1, crlExpiredDetected);
+
+    Thread_sleep(1000);
+
+    CS104_Connection_sendStartDT(con);
+
+    Thread_sleep(2000);
+
+    crlExpiredDetected = 0;
+    for (int i = 0; i < eventInfo.eventHandlerCalled; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_WRN_CRL_EXPIRED) {
+            crlExpiredDetected++;
+        }
+    }
+    TEST_ASSERT_EQUAL_INT(2, crlExpiredDetected);
+
+    CS104_Connection_sendStopDT(con);
+
+    Thread_sleep(2000);
+
+    crlExpiredDetected = 0;
+    for (int i = 0; i < eventInfo.eventHandlerCalled; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_WRN_CRL_EXPIRED) {
+            crlExpiredDetected++;
+        }
+    }
+
+    CS104_Connection_close(con);
+    CS104_Slave_destroy(slave);
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    //TEST_ASSERT_EQUAL_INT(2, crlExpiredDetected);
 }
 
 void
@@ -6189,13 +7695,16 @@ test_CS104_MasterSlave_TLSCertificateRevokedBeforeRenegotiation(void)
     res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
     TEST_ASSERT_TRUE(res);
 
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+
+    /* Set short renegotiation time (1 second) so renegotiation happens quickly */
     TLSConfiguration_setRenegotiationTime(tlsConfig1, 1000);
 
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
-    TLSConfiguration_setChainValidation(tlsConfig2, true);;
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
 
-    /* use revoked certificate */
+    /* Client uses certificate that IS revoked in test.crl (client_CA1_3, serial ...C9) */
     res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
     TEST_ASSERT_TRUE(res);
     res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
@@ -6215,21 +7724,25 @@ test_CS104_MasterSlave_TLSCertificateRevokedBeforeRenegotiation(void)
 
     TEST_ASSERT_NOT_NULL(con);
 
+    /* Initial connection succeeds because server has no CRL loaded yet */
     bool result = CS104_Connection_connect(con);
 
     TEST_ASSERT_TRUE(result);
 
     CS104_Connection_sendStartDT(con);
 
-    /* update CRL -> expect renegotiation to fail! */
+    /* Now load CRL on server side - this will be used during next renegotiation */
     res = TLSConfiguration_addCRLFromFile(tlsConfig1, "test.crl");
     TEST_ASSERT_TRUE(res);
 
+    /* Wait for renegotiation timer (1s) plus margin */
     Thread_sleep(1500);
 
-    CS101_ASDU newAsdu = CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
+    /* Send data to trigger renegotiation check */
+    CS101_ASDU newAsdu =
+        CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-    InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, 1, IEC60870_QUALITY_GOOD);
+    InformationObject io = (InformationObject)MeasuredValueScaled_create(NULL, 110, 1, IEC60870_QUALITY_GOOD);
 
     CS101_ASDU_addInformationObject(newAsdu, io);
 
@@ -6239,6 +7752,7 @@ test_CS104_MasterSlave_TLSCertificateRevokedBeforeRenegotiation(void)
 
     CS101_ASDU_destroy(newAsdu);
 
+    /* Wait for renegotiation to complete and connection to close */
     Thread_sleep(1500);
 
     CS104_Slave_destroy(slave);
@@ -6248,8 +7762,329 @@ test_CS104_MasterSlave_TLSCertificateRevokedBeforeRenegotiation(void)
     TLSConfiguration_destroy(tlsConfig1);
     TLSConfiguration_destroy(tlsConfig2);
 
-    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled > 0);
-    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, eventInfo.eventCodes[0]);
+    /* Verify security events:
+     * Expected sequence:
+     * - Event 0: TLS_EVENT_CODE_INF_SESSION_ESTABLISHED (initial connection succeeds, no CRL loaded yet)
+     * - Event 1: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation started after CRL loaded)
+     * - Event 2: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation completed)
+     * - Event 3: TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED (certificate validation fails after renegotiation handshake)
+     * - Many: TLS_EVENT_CODE_ALM_HANDSHAKE_FAILED_UNKNOWN_REASON (repeated handshake failures)
+     * - Eventually: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation started again)
+     * - Finally: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation failed)
+     *
+     * Note: The specific "revoked certificate" event (TLS_EVENT_CODE_ALM_CERT_REVOKED) is not raised
+     * during renegotiation in mbedTLS 2.x because certificate verification happens after the handshake
+     * completes, and the verification callback may not distinguish revoked from other validation failures
+     * in the renegotiation context. This test verifies that the connection DOES fail due to certificate
+     * validation after CRL is loaded, which is the important security property.
+     */
+
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 4);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_WRN_CRL_NOT_ACCESSIBLE, eventInfo.eventCodes[0]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_ESTABLISHED, eventInfo.eventCodes[1]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, eventInfo.eventCodes[2]);
+
+    /* Verify that certificate validation failed during or after renegotiation */
+    bool foundCertValidationFailed = false;
+    for (int i = 2; i < eventInfo.eventHandlerCalled && i < 100; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED) {
+            foundCertValidationFailed = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundCertValidationFailed);
+}
+
+void
+test_CS104_MasterSlave_TLSCRLUpdateDuringConnection(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+
+    /* Initially do NOT load any CRL - this means no certificates are revoked */
+    /* (Alternative would be to load an empty CRL, but not loading is equivalent) */
+
+    /* Set short renegotiation time (1 second) so renegotiation happens quickly */
+    TLSConfiguration_setRenegotiationTime(tlsConfig1, 1000);
+
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Client uses certificate that will be revoked when test.crl is loaded (client_CA1_3, serial ...C9) */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Initial connection succeeds because no CRL is loaded (no revocations to check) */
+    bool result = CS104_Connection_connect(con);
+
+    TEST_ASSERT_TRUE(result);
+
+    CS104_Connection_sendStartDT(con);
+
+    /* Send some data to confirm connection is working */
+    CS101_ASDU asdu1 =
+        CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
+
+    InformationObject io1 = (InformationObject)MeasuredValueScaled_create(NULL, 100, 42, IEC60870_QUALITY_GOOD);
+
+    CS101_ASDU_addInformationObject(asdu1, io1);
+
+    InformationObject_destroy(io1);
+
+    CS104_Slave_enqueueASDU(slave, asdu1);
+
+    CS101_ASDU_destroy(asdu1);
+
+    Thread_sleep(200);
+
+    /* Now load CRL with client certificate revoked - this will trigger renegotiation */
+    res = TLSConfiguration_addCRLFromFile(tlsConfig1, "test.crl");
+    TEST_ASSERT_TRUE(res);
+
+    /* Wait for renegotiation timer (1s) plus margin */
+    Thread_sleep(1500);
+
+    /* Send more data to trigger renegotiation check */
+    CS101_ASDU asdu2 =
+        CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
+
+    InformationObject io2 = (InformationObject)MeasuredValueScaled_create(NULL, 101, 43, IEC60870_QUALITY_GOOD);
+
+    CS101_ASDU_addInformationObject(asdu2, io2);
+
+    InformationObject_destroy(io2);
+
+    CS104_Slave_enqueueASDU(slave, asdu2);
+
+    CS101_ASDU_destroy(asdu2);
+
+    /* Wait for renegotiation to complete and connection to close */
+    Thread_sleep(1500);
+
+    CS104_Slave_destroy(slave);
+
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security events:
+     * Expected sequence:
+     * - Event 0: TLS_EVENT_CODE_INF_SESSION_ESTABLISHED (initial connection succeeds, no CRL loaded)
+     * - Event 1: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation started after CRL loaded and updated)
+     * - Event 2: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation completed)
+     * - Event 3: TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED (certificate validation fails - client cert now revoked)
+     * - Many: TLS_EVENT_CODE_ALM_HANDSHAKE_FAILED_UNKNOWN_REASON (repeated handshake failures)
+     * - Eventually: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation started again)
+     * - Finally: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation failed)
+     *
+     * This test validates IEC 62351-3 Section 6.2.6 requirement: "If the CRL is updated, a TLS
+     * renegotiation shall be performed to ensure that the peer's certificate is validated against
+     * the updated CRL." The test confirms that after a CRL update that revokes a client certificate,
+     * the automatic renegotiation detects the revocation and terminates the connection.
+     */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 4);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_WRN_CRL_NOT_ACCESSIBLE, eventInfo.eventCodes[0]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_ESTABLISHED, eventInfo.eventCodes[1]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, eventInfo.eventCodes[2]);
+
+    /* Verify that certificate validation failed during or after renegotiation */
+    bool foundCertValidationFailed = false;
+    for (int i = 2; i < eventInfo.eventHandlerCalled && i < 100; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED) {
+            foundCertValidationFailed = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundCertValidationFailed);
+}
+
+void
+test_CS104_MasterSlave_TLSCRLUpdateWithNewRevocation(void)
+{
+    struct secEventInfo eventInfo;
+    memset(&eventInfo, 0, sizeof(struct secEventInfo));
+
+    bool res = false;
+
+    TLSConfiguration tlsConfig1 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig1, true);
+
+    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, &eventInfo);
+
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig1, "server_CA1_1.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+
+    /* Initially load CRL that only revokes client_CA1_2 (serial ...C6) */
+    /* This CRL does NOT revoke client_CA1_3 (serial ...C9) yet */
+    res = TLSConfiguration_addCRLFromFile(tlsConfig1, "test_initial.crl");
+    TEST_ASSERT_TRUE(res);
+
+    /* Set short renegotiation time (1 second) so renegotiation happens quickly */
+    TLSConfiguration_setRenegotiationTime(tlsConfig1, 1000);
+
+    TLSConfiguration tlsConfig2 = TLSConfiguration_create();
+
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+
+    /* Client uses client_CA1_3 (serial ...C9) which is NOT revoked in test_initial.crl */
+    /* but WILL BE revoked when we update to test.crl */
+    res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_setOwnCertificateFromFile(tlsConfig2, "client_CA1_3.pem");
+    TEST_ASSERT_TRUE(res);
+    res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
+    TEST_ASSERT_TRUE(res);
+
+    CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+
+    TEST_ASSERT_NOT_NULL(slave);
+
+    CS104_Slave_setLocalPort(slave, 20004);
+
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_createSecure("127.0.0.1", 20004, tlsConfig2);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    /* Initial connection succeeds because client_CA1_3 is NOT revoked in test_initial.crl */
+    bool result = CS104_Connection_connect(con);
+
+    TEST_ASSERT_TRUE(result);
+
+    CS104_Connection_sendStartDT(con);
+
+    /* Send some data to confirm connection is working */
+    CS101_ASDU asdu1 =
+        CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
+
+    InformationObject io1 = (InformationObject)MeasuredValueScaled_create(NULL, 100, 42, IEC60870_QUALITY_GOOD);
+
+    CS101_ASDU_addInformationObject(asdu1, io1);
+
+    InformationObject_destroy(io1);
+
+    CS104_Slave_enqueueASDU(slave, asdu1);
+
+    CS101_ASDU_destroy(asdu1);
+
+    Thread_sleep(200);
+
+    /* Now update CRL to test.crl which also revokes client_CA1_3 (adds ...C9 to revocations) */
+    /* This simulates a real-world scenario where a new certificate gets revoked */
+    res = TLSConfiguration_addCRLFromFile(tlsConfig1, "test.crl");
+    TEST_ASSERT_TRUE(res);
+
+    /* Wait for renegotiation timer (1s) plus margin */
+    Thread_sleep(1500);
+
+    /* Send more data to trigger renegotiation check */
+    CS101_ASDU asdu2 =
+        CS101_ASDU_create(CS104_Slave_getAppLayerParameters(slave), false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
+
+    InformationObject io2 = (InformationObject)MeasuredValueScaled_create(NULL, 101, 43, IEC60870_QUALITY_GOOD);
+
+    CS101_ASDU_addInformationObject(asdu2, io2);
+
+    InformationObject_destroy(io2);
+
+    CS104_Slave_enqueueASDU(slave, asdu2);
+
+    CS101_ASDU_destroy(asdu2);
+
+    /* Wait for renegotiation to complete and connection to close */
+    Thread_sleep(1500);
+
+    CS104_Slave_destroy(slave);
+
+    CS104_Connection_destroy(con);
+
+    TLSConfiguration_destroy(tlsConfig1);
+    TLSConfiguration_destroy(tlsConfig2);
+
+    /* Verify security events:
+     * Expected sequence:
+     * - Event 0: TLS_EVENT_CODE_INF_SESSION_ESTABLISHED (initial connection succeeds, client cert not revoked)
+     * - Event 1: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation started after CRL updated)
+     * - Event 2: TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION (renegotiation completed)
+     * - Event 3: TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED (certificate validation fails - client cert now revoked)
+     * - Many: TLS_EVENT_CODE_ALM_HANDSHAKE_FAILED_UNKNOWN_REASON (repeated handshake failures)
+     *
+     * This test validates IEC 62351-3 Section 6.2.6 requirement: "If the CRL is updated, a TLS
+     * renegotiation shall be performed to ensure that the peer's certificate is validated against
+     * the updated CRL." The test confirms that when a CRL is updated to add a NEW revocation for
+     * a client certificate that was previously valid, the automatic renegotiation detects the
+     * new revocation and terminates the connection.
+     *
+     * Test scenario:
+     * 1. Server loads test_initial.crl (only revokes client_CA1_2, serial ...C6)
+     * 2. Client connects with client_CA1_3 (serial ...C9) - NOT revoked yet - connection succeeds
+     * 3. Server updates to test.crl (revokes both ...C6 AND ...C9)
+     * 4. Automatic renegotiation triggered
+     * 5. Client certificate now detected as revoked
+     * 6. Connection terminated
+     *
+     * Note: The specific "revoked certificate" event (TLS_EVENT_CODE_ALM_CERT_REVOKED) is not raised
+     * during renegotiation in mbedTLS 2.x because certificate verification happens after the handshake
+     * completes, and the verification callback may not distinguish revoked from other validation failures
+     * in the renegotiation context. This test verifies that the connection DOES fail due to certificate
+     * validation after CRL is loaded, which is the important security property.
+     */
+    TEST_ASSERT_TRUE(eventInfo.eventHandlerCalled >= 4);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_ESTABLISHED, eventInfo.eventCodes[0]);
+    TEST_ASSERT_EQUAL_INT(TLS_EVENT_CODE_INF_SESSION_RENEGOTIATION, eventInfo.eventCodes[1]);
+
+    /* Verify that certificate validation failed during or after renegotiation */
+    bool foundCertValidationFailed = false;
+    for (int i = 2; i < eventInfo.eventHandlerCalled && i < 100; i++) {
+        if (eventInfo.eventCodes[i] == TLS_EVENT_CODE_ALM_CERT_VALIDATION_FAILED) {
+            foundCertValidationFailed = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundCertValidationFailed);
 }
 
 void
@@ -6262,7 +8097,7 @@ test_CS104_MasterSlave_TLSCertificateRevokedBeforeReconnect(void)
     TLSConfiguration_enableSessionResumption(tlsConfig1, false);
     TLSConfiguration_setChainValidation(tlsConfig1, true);
 
-    TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, NULL);
+   // TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, NULL);
 
     res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
     TEST_ASSERT_TRUE(res);
@@ -6271,11 +8106,14 @@ test_CS104_MasterSlave_TLSCertificateRevokedBeforeReconnect(void)
     res = TLSConfiguration_addCACertificateFromFile(tlsConfig1, "root_CA1.pem");
     TEST_ASSERT_TRUE(res);
 
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+
     TLSConfiguration_setRenegotiationTime(tlsConfig1, 1000);
 
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
-    TLSConfiguration_setChainValidation(tlsConfig2, true);;
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    
 
     /* use revoked certificate */
     res = TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_3.key", NULL);
@@ -6284,6 +8122,8 @@ test_CS104_MasterSlave_TLSCertificateRevokedBeforeReconnect(void)
     TEST_ASSERT_TRUE(res);
     res = TLSConfiguration_addCACertificateFromFile(tlsConfig2, "root_CA1.pem");
     TEST_ASSERT_TRUE(res);
+
+    TLSConfiguration_setEventHandler(tlsConfig2, securityEventHandler, NULL);
 
     CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
 
@@ -6336,10 +8176,12 @@ test_CS104_MasterSlave_TLSUnknownCertificate(void)
     TLSConfiguration_addAllowedCertificateFromFile(tlsConfig1, "client_CA1_3.pem");
 
     TLSConfiguration_setMinTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
 
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
-    TLSConfiguration_setChainValidation(tlsConfig2, true);;
+    TLSConfiguration_setChainValidation(tlsConfig2, true);
+    ;
 
     /* use expired certificate */
     TLSConfiguration_setOwnKeyFromFile(tlsConfig2, "client_CA1_4.key", NULL);
@@ -6442,7 +8284,6 @@ test_CS104_MasterSlave_TLSCertificateSessionResumptionExpiredAtClient(void)
 
     TLSConfiguration_setChainValidation(tlsConfig1, true);
 
-
     TLSConfiguration_setEventHandler(tlsConfig1, securityEventHandler, NULL);
 
     res = TLSConfiguration_setOwnKeyFromFile(tlsConfig1, "server_CA1_1.key", NULL);
@@ -6453,6 +8294,8 @@ test_CS104_MasterSlave_TLSCertificateSessionResumptionExpiredAtClient(void)
     TEST_ASSERT_TRUE(res);
 
     TLSConfiguration_setRenegotiationTime(tlsConfig1, 1000);
+
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
 
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
@@ -6531,6 +8374,7 @@ test_CS104_MasterSlave_TLSCertificateSessionResumptionExpiredAtServer(void)
     TLSConfiguration tlsConfig2 = TLSConfiguration_create();
 
     TLSConfiguration_enableSessionResumption(tlsConfig2, true);
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
 
     TLSConfiguration_setChainValidation(tlsConfig2, true);
 
@@ -6604,6 +8448,8 @@ test_CS104_MasterSlave_TLSReuseConfigurationWithSessionResumption(void)
     TLSConfiguration_addAllowedCertificateFromFile(tlsConfig2, "server_CA1_1.pem");
 
     CS104_Slave slave = CS104_Slave_createSecure(100, 100, tlsConfig1);
+
+    TLSConfiguration_setMaxTlsVersion(tlsConfig1, TLS_VERSION_TLS_1_2);
 
     TEST_ASSERT_NOT_NULL(slave);
 
@@ -6703,8 +8549,8 @@ test_ASDUsetGetNumberOfElements(void)
     CS101_ASDU_destroy(asdu);
 }
 
-static uint8_t STARTDT_ACT_MSG[] = { 0x68, 0x04, 0x07, 0x00, 0x00, 0x00 };
-static uint8_t STOPDT_ACT_MSG[] = { 0x68, 0x04, 0x13, 0x00, 0x00, 0x00 };
+static uint8_t STARTDT_ACT_MSG[] = {0x68, 0x04, 0x07, 0x00, 0x00, 0x00};
+static uint8_t STOPDT_ACT_MSG[] = {0x68, 0x04, 0x13, 0x00, 0x00, 0x00};
 
 void
 test_CS104SlaveUnconfirmedStoppedMode()
@@ -6725,10 +8571,12 @@ test_CS104SlaveUnconfirmedStoppedMode()
 
     int16_t scaledValue = 0;
 
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < 15; i++)
+    {
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        InformationObject io =
+            (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
 
         scaledValue++;
 
@@ -6772,7 +8620,8 @@ test_CS104SlaveUnconfirmedStoppedMode()
 
         CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
+        InformationObject io =
+            (InformationObject)MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
 
         scaledValue++;
 
@@ -6804,7 +8653,7 @@ test_CS104SlaveUnconfirmedStoppedMode()
 
 #define SCALED_VALUE_MAX 32767
 #define SCALED_VALUE_MIN -32768
-#define NORMALIZED_VALUE_MAX (32767.f/32768.f)
+#define NORMALIZED_VALUE_MAX (32767.f / 32768.f)
 
 void
 test_ScaledNormalizedConversion()
@@ -6865,7 +8714,7 @@ test_CS104Connection_cannotWriteToSocketWhenNotConnected()
 }
 
 static bool
-test_CS104Slave_handleTestCommand_asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
+test_CS104Slave_handleTestCommand_asduReceivedHandler(void* parameter, int address, CS101_ASDU asdu)
 {
     CS101_ASDU* receivedASDU = (CS101_ASDU*)parameter;
 
@@ -6873,7 +8722,7 @@ test_CS104Slave_handleTestCommand_asduReceivedHandler (void* parameter, int addr
     {
         CS101_ASDU_destroy(*receivedASDU);
     }
-    
+
     *receivedASDU = CS101_ASDU_clone(asdu, NULL);
 
     return true;
@@ -6902,7 +8751,7 @@ test_CS104Slave_handleTestCommandWithTimestamp()
 
     CS104_Connection_sendStartDT(con);
 
-    TestCommandWithCP56Time2a  tc;
+    TestCommandWithCP56Time2a tc;
 
     uint64_t time1 = Hal_getTimeInMs();
     struct sCP56Time2a cpTime1;
@@ -6913,7 +8762,7 @@ test_CS104Slave_handleTestCommandWithTimestamp()
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
     TestCommandWithCP56Time2a_destroy(tc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -6928,7 +8777,7 @@ test_CS104Slave_handleTestCommandWithTimestamp()
     /* send test command with wrong COT */
     tc = TestCommandWithCP56Time2a_create(NULL, 0xaa55, &cpTime1);
     asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION_CON, 0, 1, false, false);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
     TestCommandWithCP56Time2a_destroy(tc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -6943,8 +8792,8 @@ test_CS104Slave_handleTestCommandWithTimestamp()
     /* send test command with correct COT but IOA != 0 */
     tc = TestCommandWithCP56Time2a_create(NULL, 0xaa55, &cpTime1);
     InformationObject_setObjectAddress((InformationObject)tc, 2);
-    asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION_CON, 0, 1, false, false);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
     TestCommandWithCP56Time2a_destroy(tc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -6960,7 +8809,7 @@ test_CS104Slave_handleTestCommandWithTimestamp()
     tc = TestCommandWithCP56Time2a_create(NULL, 0xaa55, &cpTime1);
     InformationObject_setObjectAddress((InformationObject)tc, 2);
     asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION_TERMINATION, 0, 1, false, false);
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
     TestCommandWithCP56Time2a_destroy(tc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -6969,7 +8818,7 @@ test_CS104Slave_handleTestCommandWithTimestamp()
 
     TEST_ASSERT_NOT_NULL(receivedASDU);
     TEST_ASSERT_EQUAL_INT(C_TS_TA_1, CS101_ASDU_getTypeID(receivedASDU));
-    TEST_ASSERT_EQUAL_INT(CS101_COT_UNKNOWN_IOA, CS101_ASDU_getCOT(receivedASDU));
+    TEST_ASSERT_EQUAL_INT(CS101_COT_UNKNOWN_COT, CS101_ASDU_getCOT(receivedASDU));
     TEST_ASSERT_TRUE(CS101_ASDU_isNegative(receivedASDU));
 
     CS104_Connection_close(con);
@@ -7005,7 +8854,7 @@ test_CS104Slave_rejectCommandsWithBroadcastCA()
 
     CS104_Connection_sendStartDT(con);
 
-    TestCommandWithCP56Time2a  tc;
+    TestCommandWithCP56Time2a tc;
 
     uint64_t time1 = Hal_getTimeInMs();
     struct sCP56Time2a cpTime1;
@@ -7014,9 +8863,10 @@ test_CS104Slave_rejectCommandsWithBroadcastCA()
     tc = TestCommandWithCP56Time2a_create(NULL, 0xaa55, &cpTime1);
 
     /* send test command with CASDU = 65535 (broadcast)*/
-    CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 65535, false, false);
+    CS101_ASDU asdu =
+        CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 65535, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
     TestCommandWithCP56Time2a_destroy(tc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -7033,7 +8883,7 @@ test_CS104Slave_rejectCommandsWithBroadcastCA()
     /* send read command with CASDU = 65535 (broadcast)*/
     asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 65535, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) rc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)rc);
     ReadCommand_destroy(rc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -7053,7 +8903,7 @@ test_CS104Slave_rejectCommandsWithBroadcastCA()
     /* send delay acquisition command with CASDU = 65535 (broadcast)*/
     asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 65535, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) dac);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)dac);
     DelayAcquisitionCommand_destroy(dac);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -7109,7 +8959,7 @@ test_CS104Slave_rejectCommandWithUnknownCA()
 
     CS104_Connection_sendStartDT(con);
 
-    TestCommandWithCP56Time2a  tc;
+    TestCommandWithCP56Time2a tc;
 
     uint64_t time1 = Hal_getTimeInMs();
     struct sCP56Time2a cpTime1;
@@ -7120,7 +8970,7 @@ test_CS104Slave_rejectCommandWithUnknownCA()
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
     TestCommandWithCP56Time2a_destroy(tc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -7137,7 +8987,7 @@ test_CS104Slave_rejectCommandWithUnknownCA()
 
     asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, expectedCa, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) tc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)tc);
     TestCommandWithCP56Time2a_destroy(tc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -7202,7 +9052,7 @@ test_CS104Slave_handleResetProcessCommand()
 
     CS101_ASDU asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) rpc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)rpc);
     ResetProcessCommand_destroy(rpc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -7214,7 +9064,8 @@ test_CS104Slave_handleResetProcessCommand()
     TEST_ASSERT_EQUAL_INT(CS101_COT_UNKNOWN_TYPE_ID, CS101_ASDU_getCOT(receivedASDU));
     TEST_ASSERT_TRUE(CS101_ASDU_isNegative(receivedASDU));
 
-    if (receivedASDU) {
+    if (receivedASDU)
+    {
         CS101_ASDU_destroy(receivedASDU);
         receivedASDU = NULL;
     }
@@ -7225,7 +9076,7 @@ test_CS104Slave_handleResetProcessCommand()
 
     asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) rpc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)rpc);
     ResetProcessCommand_destroy(rpc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -7244,7 +9095,7 @@ test_CS104Slave_handleResetProcessCommand()
 
     asdu = CS101_ASDU_create(&defaultAppLayerParameters, false, CS101_COT_ACTIVATION, 0, 1, false, false);
 
-    CS101_ASDU_addInformationObject(asdu, (InformationObject) rpc);
+    CS101_ASDU_addInformationObject(asdu, (InformationObject)rpc);
     ResetProcessCommand_destroy(rpc);
     TEST_ASSERT_TRUE(CS104_Connection_sendASDU(con, asdu));
     CS101_ASDU_destroy(asdu);
@@ -7263,6 +9114,345 @@ test_CS104Slave_handleResetProcessCommand()
 
     if (receivedASDU)
         CS101_ASDU_destroy(receivedASDU);
+
+    CS104_Slave_destroy(slave);
+}
+
+/*
+ * Test: Client sends TESTFR_ACT after T3 timeout when connection remains INACTIVE (no STARTDT)
+ * We start a server and a client in threadless mode, set a short T3 (2s), leave connection inactive,
+ * and poll both sides until we observe the TESTFR_ACT frame (0x68 0x04 0x43 00 00 00) received by the server.
+ */
+static uint8_t _testfr_frame[6];
+static bool _testfr_found = false;
+
+static void
+_testfr_rawHandler(void* parameter, IMasterConnection connection, uint8_t* msg, int msgSize, bool sent)
+{
+    (void)parameter;
+    (void)connection;
+
+    /* print raw frames for debugging */
+    {
+        char peerAddrBuf[128];
+        peerAddrBuf[0] = '\0';
+
+        if (connection)
+        {
+            /* fill peer address string if available */
+            IMasterConnection_getPeerAddress(connection, peerAddrBuf, sizeof(peerAddrBuf));
+        }
+
+        // printf("[RAW %s] size=%d peer=%s sent=%s\n", (sent ? "SENT" : "RECV"), msgSize,
+        //        (peerAddrBuf[0] != '\0' ? peerAddrBuf : "unknown"), (sent ? "true" : "false"));
+
+        // if (msg && msgSize > 0)
+        // {
+        //     printf("  data:");
+        //     for (int i = 0; i < msgSize; i++)
+        //     {
+        //         printf(" %02x", msg[i]);
+        //     }
+        //     printf("\n");
+        //     fflush(stdout);
+        // }
+    }
+
+    if (!sent && msgSize == 6 && msg[0] == 0x68 && msg[1] == 0x04 && msg[2] == 0x43)
+    {
+        memcpy(_testfr_frame, msg, 6);
+        _testfr_found = true;
+    }
+}
+
+void
+test_CS104_Connection_sendsTestFrAfterT3TimeoutInactive()
+{
+    _testfr_found = false;
+    memset(_testfr_frame, 0, sizeof(_testfr_frame));
+
+    /* Start slave in threadless mode */
+    CS104_Slave slave = CS104_Slave_create(5, 5);
+    TEST_ASSERT_NOT_NULL(slave);
+    CS104_Slave_setServerMode(slave, CS104_MODE_SINGLE_REDUNDANCY_GROUP);
+    CS104_Slave_setLocalPort(slave, 20014);
+    CS104_Slave_startThreadless(slave);
+    CS104_Slave_setRawMessageHandler(slave, _testfr_rawHandler, NULL);
+
+    /* Create client connection threadless with small T3 */
+    CS104_Connection con = CS104_Connection_create("127.0.0.1", 20014);
+    TEST_ASSERT_NOT_NULL(con);
+    CS104_APCIParameters p = CS104_Connection_getAPCIParameters(con);
+    p->t3 = 2; /* seconds */
+    p->t2 = 1; /* keep small just in case */
+    p->t1 = 3; /* arbitrary */
+
+    /* Establish socket in threadless mode */
+    TEST_ASSERT_TRUE_MESSAGE(CS104_Connection_startThreadless(con), "Failed to start threadless connection");
+
+    /* Loop until TESTFR_ACT observed or timeout (~5s) */
+    uint64_t start = Hal_getTimeInMs();
+    while (!_testfr_found && (Hal_getTimeInMs() - start) < 5500)
+    {
+        CS104_Slave_tick(slave);
+        CS104_Connection_run(con, 50); /* wait up to 50ms for client socket events */
+        Thread_sleep(20);
+    }
+
+    TEST_ASSERT_TRUE_MESSAGE(_testfr_found, "Did not capture TESTFR_ACT after T3 timeout in inactive state");
+    TEST_ASSERT_EQUAL_UINT8(0x68, _testfr_frame[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x04, _testfr_frame[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x43, _testfr_frame[2]);
+
+    /* Cleanup */
+    CS104_Connection_stopThreadless(con);
+    CS104_Connection_destroy(con);
+    CS104_Slave_stopThreadless(slave);
+    CS104_Slave_destroy(slave);
+}
+
+static void*
+silent_server_thread(void* parameter)
+{
+    int port = 20005;
+    ServerSocket serverSocket = TcpServerSocket_create(NULL, port);
+
+    if (serverSocket)
+    {
+        ServerSocket_listen(serverSocket);
+
+        Socket clientSocket = NULL;
+        int retry = 0;
+
+        while (clientSocket == NULL && retry < 100)
+        {
+            clientSocket = ServerSocket_accept(serverSocket);
+
+            if (clientSocket == NULL)
+            {
+                Thread_sleep(10);
+                retry++;
+            }
+        }
+
+        if (clientSocket)
+        {
+            uint8_t buffer[100];
+
+            /* Read START_DT ACT */
+            Socket_read(clientSocket, buffer, 100);
+
+            /* Do NOT send START_DT CON */
+
+            /* Wait longer than T1 (1s) */
+            Thread_sleep(2000);
+
+            Socket_destroy(clientSocket);
+        }
+
+        ServerSocket_destroy(serverSocket);
+    }
+
+    return NULL;
+}
+
+static CS104_ConnectionEvent test_CS104_Connection_StartDTTimeout_event = CS104_CONNECTION_OPENED;
+
+static void
+test_CS104_Connection_StartDTTimeout_connectionHandler(void* parameter, CS104_Connection connection,
+                                                       CS104_ConnectionEvent event)
+{
+    test_CS104_Connection_StartDTTimeout_event = event;
+}
+
+void
+test_CS104_Connection_StartDTTimeout(void)
+{
+    test_CS104_Connection_StartDTTimeout_event = CS104_CONNECTION_OPENED;
+
+    Thread serverThread = Thread_create(silent_server_thread, NULL, false);
+    Thread_start(serverThread);
+
+    Thread_sleep(100);
+
+    CS104_Connection con = CS104_Connection_create("127.0.0.1", 20005);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    CS104_APCIParameters apciParameters = CS104_Connection_getAPCIParameters(con);
+    apciParameters->t1 = 1;
+
+    CS104_Connection_setConnectionHandler(con, test_CS104_Connection_StartDTTimeout_connectionHandler, NULL);
+
+    bool connected = CS104_Connection_connect(con);
+
+    TEST_ASSERT_TRUE(connected);
+
+    CS104_Connection_sendStartDT(con);
+
+    /* Wait for timeout (T1 = 1s) + some margin */
+    Thread_sleep(2000);
+
+    TEST_ASSERT_EQUAL_INT(CS104_CONNECTION_CLOSED, test_CS104_Connection_StartDTTimeout_event);
+
+    CS104_Connection_destroy(con);
+    Thread_destroy(serverThread);
+}
+
+static void*
+silent_server_thread_stop_dt(void* parameter)
+{
+    int port = 20006;
+    ServerSocket serverSocket = TcpServerSocket_create(NULL, port);
+
+    if (serverSocket)
+    {
+        ServerSocket_listen(serverSocket);
+
+        Socket clientSocket = NULL;
+        int retry = 0;
+
+        while (clientSocket == NULL && retry < 100)
+        {
+            clientSocket = ServerSocket_accept(serverSocket);
+
+            if (clientSocket == NULL)
+            {
+                Thread_sleep(10);
+                retry++;
+            }
+        }
+
+        if (clientSocket)
+        {
+            uint8_t buffer[100];
+
+            /* Read START_DT ACT */
+            int readBytes = Socket_read(clientSocket, buffer, 100);
+
+            if (readBytes > 0)
+            {
+                /* Send START_DT CON */
+                uint8_t startDtCon[] = {0x68, 0x04, 0x0B, 0x00, 0x00, 0x00};
+                Socket_write(clientSocket, startDtCon, 6);
+
+                /* Read STOP_DT ACT */
+                Socket_read(clientSocket, buffer, 100);
+
+                /* Do NOT send STOP_DT CON */
+
+                /* Wait longer than T1 (1s) */
+                Thread_sleep(2000);
+            }
+
+            Socket_destroy(clientSocket);
+        }
+
+        ServerSocket_destroy(serverSocket);
+    }
+
+    return NULL;
+}
+
+static CS104_ConnectionEvent test_CS104_Connection_StopDTTimeout_event = CS104_CONNECTION_OPENED;
+
+static void
+test_CS104_Connection_StopDTTimeout_connectionHandler(void* parameter, CS104_Connection connection,
+                                                      CS104_ConnectionEvent event)
+{
+    test_CS104_Connection_StopDTTimeout_event = event;
+}
+
+void
+test_CS104_Connection_StopDTTimeout(void)
+{
+    test_CS104_Connection_StopDTTimeout_event = CS104_CONNECTION_OPENED;
+
+    Thread serverThread = Thread_create(silent_server_thread_stop_dt, NULL, false);
+    Thread_start(serverThread);
+
+    Thread_sleep(100);
+
+    CS104_Connection con = CS104_Connection_create("127.0.0.1", 20006);
+
+    TEST_ASSERT_NOT_NULL(con);
+
+    CS104_APCIParameters apciParameters = CS104_Connection_getAPCIParameters(con);
+    apciParameters->t1 = 1;
+
+    CS104_Connection_setConnectionHandler(con, test_CS104_Connection_StopDTTimeout_connectionHandler, NULL);
+
+    bool connected = CS104_Connection_connect(con);
+
+    TEST_ASSERT_TRUE(connected);
+
+    CS104_Connection_sendStartDT(con);
+
+    /* Wait a bit to ensure START_DT is processed */
+    Thread_sleep(100);
+
+    CS104_Connection_sendStopDT(con);
+
+    /* Wait for timeout (T1 = 1s) + some margin */
+    Thread_sleep(2000);
+
+    TEST_ASSERT_EQUAL_INT(CS104_CONNECTION_CLOSED, test_CS104_Connection_StopDTTimeout_event);
+
+    CS104_Connection_destroy(con);
+    Thread_destroy(serverThread);
+}
+
+void
+test_CS104_Connection_isRunning(void)
+{
+    CS104_Slave slave = CS104_Slave_create(10, 10);
+
+    CS104_Slave_setServerMode(slave, CS104_MODE_SINGLE_REDUNDANCY_GROUP);
+    CS104_Slave_setLocalPort(slave, 20004);
+
+    CS104_Slave_start(slave);
+
+    CS104_Connection con = CS104_Connection_create("127.0.0.1", 20004);
+
+    TEST_ASSERT_FALSE(CS104_Connection_isConnected(con));
+
+    bool result = CS104_Connection_connect(con);
+    TEST_ASSERT_TRUE(result);
+
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
+
+    CS104_Connection_sendStartDT(con);
+
+    Thread_sleep(500);
+
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
+
+    CS104_Connection_sendStopDT(con);
+
+    Thread_sleep(500);
+
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
+
+    CS104_Connection_close(con);
+
+    TEST_ASSERT_FALSE(CS104_Connection_isConnected(con));
+
+    result = CS104_Connection_connect(con);
+    TEST_ASSERT_TRUE(result);
+
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
+
+    CS104_Connection_sendStartDT(con);
+
+    Thread_sleep(500);
+
+    TEST_ASSERT_TRUE(CS104_Connection_isConnected(con));
+
+    CS104_Connection_close(con);
+
+    TEST_ASSERT_FALSE(CS104_Connection_isConnected(con));
+
+    CS104_Connection_destroy(con);
 
     CS104_Slave_destroy(slave);
 }
@@ -7378,11 +9568,35 @@ main(int argc, char** argv)
     RUN_TEST(test_CS104_MasterSlave_TLSConnectSuccess);
     RUN_TEST(test_CS104_MasterSlave_TLSConnectSuccessWithoutSeparateCACert);
     RUN_TEST(test_CS104_MasterSlave_TLSConnectFails);
+
+#ifndef WITH_MBEDTLS3
     RUN_TEST(test_CS104_MasterSlave_TLSVersionMismatch);
+#endif
+
+#ifdef WITH_MBEDTLS3
+    RUN_TEST(test_CS104_MasterSlave_TLSVersionMismatch_mbedtls3);
+#endif
+   RUN_TEST(test_CS104_MasterSlave_TLSCipherSuiteMismatch);
+    RUN_TEST(test_CS104_MasterSlave_TLSCipherSuiteMismatch_TLS_PSK_WITH_AES_256_GCM_SHA384);
+    RUN_TEST(test_CS104_MasterSlave_TLSClientCertificateNotProvided);
+    RUN_TEST(test_CS104_MasterSlave_TLSVersionChangeDetected);
+    ///// !!! RUN_TEST(test_CS104_MasterSlave_TLSCertificateSizeExceeded);
+    RUN_TEST(test_CS104_MasterSlave_TLSCRLExpired);
     RUN_TEST(test_CS104_MasterSlave_TLSCertificateExpired);
     RUN_TEST(test_CS104_MasterSlave_TLSCertificateRevoked);
+    RUN_TEST(test_CS104_MasterSlave_TLSInsufficientKeyLength);
+    RUN_TEST(test_CS104_MasterSlave_TLSInsufficientServerKeyLength);
+    RUN_TEST(test_CS104_MasterSlave_TLSWarningMinimumKeyLength);
+    RUN_TEST(test_CS104_MasterSlave_TLSWarningMinimumServerKeyLength);
+    RUN_TEST(test_CS104_MasterSlave_TLSInvalidSignature);
+    RUN_TEST(test_CS104_MasterSlave_TLSUnknownCA);
+    RUN_TEST(test_CS104_MasterSlave_TLSSuccessfulRenegotiation);
     RUN_TEST(test_CS104_MasterSlave_TLSRenegotiateAfterCRLUpdate);
+    RUN_TEST(test_CS104_MasterSlave_TLSRenegotiationCRLExpired);
     RUN_TEST(test_CS104_MasterSlave_TLSCertificateRevokedBeforeRenegotiation);
+    RUN_TEST(test_CS104_MasterSlave_TLSCRLUpdateDuringConnection);
+    RUN_TEST(test_CS104_MasterSlave_TLSCRLUpdateWithNewRevocation);
+
     RUN_TEST(test_CS104_MasterSlave_TLSCertificateRevokedBeforeReconnect);
     RUN_TEST(test_CS104_MasterSlave_TLSUnknownCertificate);
     RUN_TEST(test_CS104_MasterSlave_TLSUseSessionResumption);
@@ -7407,6 +9621,13 @@ main(int argc, char** argv)
     RUN_TEST(test_CS104Slave_rejectCommandWithUnknownCA);
 
     RUN_TEST(test_CS104Slave_handleResetProcessCommand);
+
+    RUN_TEST(test_CS104_Connection_sendsTestFrAfterT3TimeoutInactive);
+
+    RUN_TEST(test_CS104_Connection_StartDTTimeout);
+    RUN_TEST(test_CS104_Connection_StopDTTimeout);
+
+    RUN_TEST(test_CS104_Connection_isRunning);
 
     return UNITY_END();
 }

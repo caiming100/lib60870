@@ -929,6 +929,11 @@ CS101_FileServer_create(CS101_AppLayerParameters alParams)
         self->plugin.parameter = self;
         self->plugin.handleAsdu = CS101_FileServer_handleAsdu;
         self->plugin.runTask = CS101_FileServer_runTask;
+        self->plugin.sendAsdu = NULL;
+        self->plugin.setEnqueueFunction = NULL;
+        self->plugin.hasAsduToSend = NULL;
+        self->plugin.getNextAsduToSend = NULL;
+        self->plugin.setForwardAsduFunction = NULL;
     }
 
     return self;

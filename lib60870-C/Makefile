@@ -20,6 +20,7 @@ ifeq ($(HAL_IMPL), WIN32)
 LIB_SOURCE_DIRS += src/hal/socket/win32
 LIB_SOURCE_DIRS += src/hal/thread/win32
 LIB_SOURCE_DIRS += src/hal/time/win32
+LIB_SOURCE_DIRS += src/hal/serial/win32
 LIB_SOURCE_DIRS += src/hal/memory
 else ifeq ($(HAL_IMPL), POSIX)
 LIB_SOURCE_DIRS += src/hal/socket/linux
@@ -34,20 +35,39 @@ LIB_SOURCE_DIRS += src/hal/time/unix
 LIB_SOURCE_DIRS += src/hal/memory
 endif
 
+# Auto-detect mbedtls dependency folder if not explicitly provided.
+# Prefer mbedtls-3.6* over mbedtls-2.28*, and pick the highest patch version when multiple exist.
+# If the user sets WITH_MBEDTLS or WITH_MBEDTLS3 externally, that will be respected.
+ifeq ($(strip $(WITH_MBEDTLS)),)
+ifeq ($(strip $(WITH_MBEDTLS3)),)
+	# try mbedtls-3.6* first (only directories, exclude archives)
+	MBEDTLS_DIR := $(shell for d in $(LIB60870_HOME)/dependencies/mbedtls-3.6*; do [ -d "$$d" ] && echo "$$d"; done | sort -V | tail -n1)
+	ifeq ($(strip $(MBEDTLS_DIR)),)
+		# fallback to mbedtls-2.28* (only directories)
+		MBEDTLS_DIR := $(shell for d in $(LIB60870_HOME)/dependencies/mbedtls-2.28*; do [ -d "$$d" ] && echo "$$d"; done | sort -V | tail -n1)
+		ifneq ($(strip $(MBEDTLS_DIR)),)
+			WITH_MBEDTLS := 1
+		endif
+	else
+		WITH_MBEDTLS3 := 1
+	endif
+endif
+endif
+
 ifdef WITH_MBEDTLS
-LIB_SOURCE_DIRS += dependencies/mbedtls-2.28/library
+LIB_SOURCE_DIRS += $(MBEDTLS_DIR)/library
 LIB_SOURCE_DIRS += src/hal/tls/mbedtls
 LIB_INCLUDE_DIRS += src/hal/tls/mbedtls
-LIB_INCLUDE_DIRS += dependencies/mbedtls-2.28/include
+LIB_INCLUDE_DIRS += $(MBEDTLS_DIR)/include
 CFLAGS += -D'MBEDTLS_CONFIG_FILE="mbedtls_config.h"'
 CFLAGS += -D'CONFIG_CS104_SUPPORT_TLS=1'
 endif
 
 ifdef WITH_MBEDTLS3
-LIB_SOURCE_DIRS += dependencies/mbedtls-3.6/library
+LIB_SOURCE_DIRS += $(MBEDTLS_DIR)/library
 LIB_SOURCE_DIRS += src/hal/tls/mbedtls3
 LIB_INCLUDE_DIRS += src/hal/tls/mbedtls3
-LIB_INCLUDE_DIRS += dependencies/mbedtls-3.6/include
+LIB_INCLUDE_DIRS += $(MBEDTLS_DIR)/include
 CFLAGS += -D'MBEDTLS_CONFIG_FILE="mbedtls_config.h"'
 CFLAGS += -D'CONFIG_CS104_SUPPORT_TLS=1'
 endif
